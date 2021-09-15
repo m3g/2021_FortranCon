@@ -44,7 +44,7 @@ The wrap function computes the minimum-image distance associated to a coordinate
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td valign=top><table width=100%><tr><td valign=top>
+<td valign=top>
 
 ```julia
 function wrap(x,side)
@@ -58,8 +58,8 @@ function wrap(x,side)
 end  
 ```
 
-</td></tr></table>
-<td><table width=100%><tr><td valign=top>
+</td>
+<td valign=top>
 
 ```fortran
 double precision function wrap(x,side)
@@ -74,7 +74,7 @@ double precision function wrap(x,side)
 end function wrap
 ```
 
-</td></tr></table></table>
+</td></tr></table>
 
 ### Function `force_pair`:
 
