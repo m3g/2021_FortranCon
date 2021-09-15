@@ -38,7 +38,7 @@ The wrap function computes the minimum-image distance associated to a coordinate
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td width=50% valign=top>
+<td valign=top>
 
 ```julia
 function wrap(x,side)
@@ -53,7 +53,7 @@ end
 ```
 
 </td>
-<td width=50%>
+<td valign=top>
 
 ```fortran
 double precision function wrap(x,side)
@@ -79,7 +79,7 @@ This function computes the forces given the coordinates of two particles as the 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td width=50% valign=top>
+<td valign=top>
 
 ```julia
 function force_pair(x::T,y::T,cutoff,side) where T
@@ -95,7 +95,7 @@ end
 ```
 
 </td>
-<td width=50%>
+<td valign=top>
 
 ```fortran
 subroutine force_pair(ndim,fpair,x,y,cutoff,side)
@@ -132,7 +132,7 @@ The codes are very similar, with the exception that we have opted to use use `fi
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td width=50% valign=top>
+<td valign=top>
 
 ```julia
 function forces!(
@@ -152,7 +152,7 @@ end
 ```
 
 </td>
-<td width=50%>
+<td valign=top>
 
 ```fortran
 subroutine forces(n,ndim,f,x,cutoff,side)
@@ -189,10 +189,13 @@ In Julia we create an array of arrays to store the saved trajectory, and new ste
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td width=50% valign=top>
+<td valign=top>
 
 ```julia
-function md(x0,v0,mass,dt,nsteps,isave,force_pair::F) where F
+function md(
+    x0,v0, mass,dt,
+    nsteps,isave, force_pair::F
+) where F
     x = copy(x0)
     v = copy(v0)
     f = similar(x0)
@@ -218,7 +221,7 @@ end
 ```
 
 </td>
-<td width=50%>
+<td valign=top>
 
 ```fortran
 subroutine md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
@@ -264,7 +267,7 @@ Here the codes differ a little bit, because the generation of initial coordinate
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td width=50% valign=top>
+<td valign=top>
 
 ```julia
 function main(nsteps)
@@ -293,7 +296,7 @@ end
 ```
 
 </td>
-<td width=50%>
+<td valign=top>
 
 ```fortran
 program main
@@ -349,7 +352,7 @@ On the Fortran side a simple function to return a random number was defined and 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td width=50% valign=top>
+<td valign=top>
 
 ```julia
 using StaticArrays
@@ -373,7 +376,7 @@ main(50_000)
 ```
 
 </td>
-<td width=50% valign=top>
+<td valign=top>
 
 ```fortran
 double precision function dble_rand()
