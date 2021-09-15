@@ -26,3 +26,4 @@ Manifest.toml
 *.swp
 *.xyz
 benchmark_vs_fortran/particle_simulation
+view.vmd
