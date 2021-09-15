@@ -110,11 +110,11 @@ program main
             x0(j,i) = -50 + 100*dble_rand()
             v0(j,i) = -1 + 2*dble_rand()
         end do
-        mass(i) = 1.d0
+        mass(i) = 10.d0
     end do
     ! Parameters
-    dt = 0.1
-    nsteps = 50000
+    dt = 0.001
+    nsteps = 200000
     isave = 1000
     cutoff = 5.
     side = 100.

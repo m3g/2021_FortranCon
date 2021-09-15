@@ -81,8 +81,8 @@ function main(nsteps)
     trajectory = md((
         x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:n ], 
         v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n ], 
-        mass = [ 1.0 for _ in 1:100 ],
-        dt = 0.1,
+        mass = [ 10.0 for _ in 1:100 ],
+        dt = 0.001,
         nsteps = nsteps,
         isave = 1000,
         force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
@@ -100,5 +100,5 @@ function main(nsteps)
 
 end
 
-main(50_000)
+main(200_000)
 

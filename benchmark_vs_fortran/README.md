@@ -18,20 +18,20 @@ The expected output is something like:
 ```
 Fortran:
 
-real    0m34,351s
-user    0m34,306s
+real    0m43,351s
+user    0m43,306s
 sys     0m0,020s
 
 Julia:
 
-real    0m35,848s
-user    0m36,064s
+real    0m42,848s
+user    0m42,064s
 sys     0m0,693s
 ```
 
-and two trajectory files will be created: `traj_fortran.xyz` and `traj_julia.xyz`, which can be visualized in VMD, for example. If the number of steps is changed to `500` and the `isave` parameter changed `1`, the resulting trajectories should look like this one: https://youtu.be/_yTLterogJY (with the default `50_000` steps and `isave=1000` the particles move too fast to be fun).
+and two trajectory files will be created: `traj_fortran.xyz` and `traj_julia.xyz`, which can be visualized in VMD, for example. The trajectory should look like this: https://youtu.be/GSyDRJUYWYY.
 
-Small variations are expected, but the performances will be probably similar. In my Samsung i7 8th Gen Laptop, the Fortran code results ~5% faster than the Julia code.
+Small variations are expected, but the performances will be probably similar.
 
 ## Code comparison
 
@@ -271,8 +271,8 @@ function main(nsteps)
     trajectory = md((
         x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:n ], 
         v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n ], 
-        mass = [ 1.0 for _ in 1:100 ],
-        dt = 0.1,
+        mass = [ 10.0 for _ in 1:100 ],
+        dt = 0.001,
         nsteps = nsteps,
         isave = 1000,
         force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
@@ -307,11 +307,11 @@ program main
             x0(j,i) = -50 + 100*dble_rand()
             v0(j,i) = -1 + 2*dble_rand()
         end do
-        mass(i) = 1.d0
+        mass(i) = 10.d0
     end do
     ! Parameters
-    dt = 0.1
-    nsteps = 50000
+    dt = 0.001
+    nsteps = 200000
     isave = 1000
     cutoff = 5.
     side = 100.
@@ -363,7 +363,7 @@ function random_point(::Type{Point2D{T}},range) where T
     return p
 end
 
-main(50_000)
+main(200_000)
 ```
 
 </td><td valign=top>
