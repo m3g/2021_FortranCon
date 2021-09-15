@@ -31,7 +31,7 @@ sys     0m0,693s
 
 and two trajectory files will be created: `traj_fortran.xyz` and `traj_julia.xyz`, which can be visualized in VMD, for example. If the number of steps is changed to `500` and the `isave` parameter changed `1`, the resulting trajectories should look like this one: https://youtu.be/_yTLterogJY (with the default `50_000` steps and `isave=1000` the particles move too fast to be fun).
 
-Small variations are expected, but the performances will be probably similar. 
+Small variations are expected, but the performances will be probably similar. In my Samsung i7 8th Gen Laptop, the Fortran code results ~5% faster than the Julia code.
 
 ## Code comparison
 
