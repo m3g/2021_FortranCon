@@ -31,6 +31,8 @@ sys     0m0,693s
 
 and two trajectory files will be created: `traj_fortran.xyz` and `traj_julia.xyz`, which can be visualized in VMD, for example. If the number of steps is changed to `500` and the `isave` parameter changed `1`, the resulting trajectories should look like this one: https://youtu.be/_yTLterogJY (with the default `50_000` steps and `isave=1000` the particles move too fast to be fun).
 
+<iframe width="500" style="height:315px" src="https://www.youtube.com/embed/_yTLterogJY" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
 Small variations are expected, but the performances will be probably similar. 
 
 ## Code comparison
