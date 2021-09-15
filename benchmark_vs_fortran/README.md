@@ -1,5 +1,11 @@
 # Comparing the codes and performances of two simple 2D simulations
 
+## Important
+
+These codes are not optimized for ultimate performance. Optimizations can be performed on both sides. The present comparison is only to illustrate that propertly written Julia and Fortran codes should behave and perform similarly. 
+
+## Run the benchmark
+
 To execute the benchmark, just do:
 ```bash
 ./run.sh
