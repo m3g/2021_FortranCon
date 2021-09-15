@@ -24,8 +24,8 @@ sys     0m0,020s
 
 Julia:
 
-real    0m34,848s
-user    0m35,064s
+real    0m35,848s
+user    0m36,064s
 sys     0m0,693s
 ```
 
