@@ -58,8 +58,7 @@ function wrap(x,side)
 end  
 ```
 
-</td>
-<td valign=top>
+</td><td valign=top>
 
 ```fortran
 double precision function wrap(x,side)
@@ -83,7 +82,7 @@ This function computes the forces given the coordinates of two particles as the 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td valign=top><table width=100%><tr><td valign=top>
+<td valign=top>
 
 ```julia
 function force_pair(x::T,y::T,cutoff,side) where T
@@ -98,8 +97,7 @@ function force_pair(x::T,y::T,cutoff,side) where T
 end
 ```
 
-</td></tr></table>
-<td><table width=100%><tr><td valign=top>
+</td><td valign=top>
 
 ```fortran
 subroutine force_pair(ndim,fpair,x,y,cutoff,side)
@@ -125,7 +123,7 @@ subroutine force_pair(ndim,fpair,x,y,cutoff,side)
 end subroutine force_pair
 ```
 
-</td></tr></table></table>
+</td></tr></table>
 
 ### Function `forces`:
 
@@ -134,7 +132,7 @@ The codes are very similar, with the exception that we have opted to use use `fi
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td valign=top><table width=100%><tr><td valign=top>
+<td valign=top>
 
 ```julia
 function forces!(
@@ -153,8 +151,7 @@ function forces!(
 end
 ```
 
-</td></tr></table>
-<td><table width=100%><tr><td valign=top>
+</td><td valign=top>
 
 ```fortran
 subroutine forces(n,ndim,f,x,cutoff,side)
@@ -178,7 +175,7 @@ subroutine forces(n,ndim,f,x,cutoff,side)
 end subroutine forces
 ```
 
-</td></tr></table></table>
+</td></tr></table>
 
 ### Function `md`:
 
@@ -189,7 +186,7 @@ In Julia we create an array of arrays to store the saved trajectory, and new ste
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td valign=top><table width=100%><tr><td valign=top>
+<td valign=top>
 
 ```julia
 function md(
@@ -220,8 +217,7 @@ function md(
 end
 ```
 
-</td></tr></table>
-<td><table width=100%><tr><td valign=top>
+</td><td valign=top>
 
 ```fortran
 subroutine md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
@@ -255,7 +251,7 @@ subroutine md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
 end subroutine md
 ```
 
-</td></tr></table></table>
+</td></tr></table>
 
 
 ### Main program
@@ -265,7 +261,7 @@ Here the codes differ a little bit, because the generation of initial coordinate
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td valign=top><table width=100%><tr><td valign=top>
+<td valign=top>
 
 ```julia
 function main(nsteps)
@@ -293,8 +289,7 @@ function main(nsteps)
 end
 ```
 
-</td></tr></table>
-<td><table width=100%><tr><td valign=top>
+</td><td valign=top>
 
 ```fortran
 program main
@@ -337,7 +332,7 @@ program main
 end program main
 ```
 
-</td></tr></table></table>
+</td></tr></table>
 
 ### Additional code
 
@@ -348,7 +343,7 @@ On the Fortran side a simple function to return a random number was defined and 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
-<td valign=top><table width=100%><tr><td valign=top>
+<td valign=top>
 
 ```julia
 using StaticArrays
@@ -371,8 +366,7 @@ end
 main(50_000)
 ```
 
-</td></tr></table>
-<td valign=top><table width=100%><tr><td valign=top>
+</td><td valign=top>
 
 ```fortran
 double precision function dble_rand()
@@ -390,5 +384,5 @@ double precision function norm(ndim,x)
 end function norm
 ```
 
-</td></tr></table></table>
+</td></tr></table>
 
