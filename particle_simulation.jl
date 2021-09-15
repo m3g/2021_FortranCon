@@ -24,15 +24,18 @@ begin
 	)	
 end
 
+# ╔═╡ febe8c06-b3aa-4db1-a3ea-fdc2a81bdebd
+using Printf
+
 # ╔═╡ a756dd18-fac6-4527-944e-c16d8cc4bf95
 begin
-  using PlutoUI
-  TableOfContents()
+    using PlutoUI
+    TableOfContents()
 end
 
 # ╔═╡ 4b484cf6-4888-4f04-b3fd-94862822b0c0
 md"""
-## Defining the type of particle *for the first time*
+# Defining the type of particle *for the first time*
 
 A simple point in 2D space, with coordinates `x` and `y`.
 """
@@ -47,7 +50,7 @@ end
 md"""
 We will define by hand the arithmetics needed for this kind of point. We could avoid doing all this by using the `StaticArrays` package, but for didactical reasons today we will write our arithmetics manually. Here we define what it means to add, substract, multiply and divide the points for the operations we will need. We also define a funtion that returns a point with null coordinates (the `zero` function), and a function that returns a random point in a desired interval. 
 
-We will discuss these functions and why is it interesting to define them manually later. 
+We will discuss these functions and why it may be interesting to define them manually later. 
 """
 
 # ╔═╡ 414790ef-a592-418d-b116-9864b76530bf
@@ -95,23 +98,25 @@ function force_pair(x::T,y::T,cutoff) where T
 	end
 end
 
+# ╔═╡ b5c09cd3-6063-4a36-96cd-2d128aa11b82
+const cutoff = 5.
+
 # ╔═╡ 7719b317-e85b-4583-b401-a8614d4b2373
 md"""
 The function that will compute the force over all pairs will just *naively* run over all the pairs. The function `forces!` will receive as a parameter the function that computes the force between pairs, to allow for its generality.
+
+Inside `forces!`, the `force_pair` function will receive four parameters: the indexes of the particles and their positions. We will use the indexes later. 
 """
 
 # ╔═╡ f58769a6-a656-42a3-8bc6-c204d4cfd897
-function forces!(f,x::Vector{T},force_pair) where T
+function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
+	fill!(f,zero(T))
 	n = length(x)
-	for i in 1:n
-		f[i] = zero(T)
-	end
-	return f
 	for i in 1:n-1
 		for j in i+1:n
-			fpair = force_pair(x[i],x[j])
-			f[i] += fpair
-			f[j] -= fpair
+			fpair = force_pair(i,j,x[i],x[j])
+			f[i] -= fpair
+			f[j] += fpair
 		end
 	end
 	return f
@@ -122,17 +127,23 @@ md"""
 Let us create some points to explain how the function will be called. 
 """
 
-# ╔═╡ b5c09cd3-6063-4a36-96cd-2d128aa11b82
-cutoff = 2.
-
 # ╔═╡ dd9e4332-2908-40ef-b461-6b571df56cf4
 md"""
-The function `force_pair`, will be passed to the function that computes the forces to all pairs as *closure*, which will capture the value of the cutoff. For example:
+The function `force_pair`, will be passed to the function that computes the forces to all pairs as *closure*, which will capture the value of the cutoff. The closure also allows us to ignore the indexes of the particles, which are expected by the inner implementation of the function inside `forces`. For example:
 """
+
+# ╔═╡ 0d964841-7764-48a4-9a6d-0b017ce4a90e
+v = [ Point(1.,1.), Point(2.,2.) ]
+
+# ╔═╡ c56e1910-facc-4595-81e8-e2d5d8c4e8f4
+v[1] = Point(0.,0.)
+
+# ╔═╡ d54598a0-1190-402c-8b51-2d09ca47cdf0
+v
 
 # ╔═╡ b5206dd5-1f46-4437-929b-efd68393b12b
 md"""
-## Performing a particle simulation
+# Performing a particle simulation
 
 Now, given the function that computes the forces, we can perform a particle simulation. We will use a simple Euler integration scheme, and the algorithm will be:
 
@@ -147,22 +158,25 @@ $v(t+dt) = v(t) + a(t)*dt$
 
 4. Goto 1.
 
-### The actual simulation code is as short:
+## The actual simulation code is as short:
 """
 
 # ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
-function md(;x0,v0,dt,nsteps,isave,force_pair)
+function md(x0,v0,mass,dt,nsteps,isave,force_pair::F) where F
 	x = copy(x0)
 	v = copy(v0)
 	f = similar(x0)
+	a = similar(x0)
 	trajectory = [ copy(x0) ] # will store the trajectory
 	for step in 1:nsteps
 		# Compute forces
 		forces!(f,x,force_pair)
+		# Accelerations
+		@. a = f / mass
 		# Update positions
-		x .= x .+ v*dt .+ (f/2)*dt^2
+		@. x = x + v*dt + a*dt^2/2
 		# Update velocities
-		v .= v .+ (f/2)*dt
+		@. v = v + a*dt
 		# Save if required
 		if mod(step,isave) == 0
 			push!(trajectory,copy(x))
@@ -173,12 +187,17 @@ end
 
 # ╔═╡ 66c7d960-7e05-4613-84e8-2a40fe40dc3d
 md"""
-### Lets run the simulation!
+## Lets run the simulation!
+"""
+
+# ╔═╡ e717a8d9-ccfb-4f89-b2a2-f244f108b48d
+md"""
+Here we generate random positions and velocities, and use masses equal to `1.0` for all particles.
 """
 
 # ╔═╡ eab7b195-64d5-4587-8687-48a673ab091b
 md"""
-## Using periodic boundary conditions
+# Using periodic boundary conditions
 
 Our particles just explode, since they have initial random velocities and there are only repulsive interactions. 
 
@@ -219,7 +238,7 @@ And steal the `norm` function from `LinearAlgebra`, which cannot be directly use
 
 # ╔═╡ 34dc72dc-4864-47c0-b730-183f67e7aea3
 md"""
-### Wrapping of coordinates
+## Wrapping of coordinates
 
 The following function defines how to wrap the coordinates on the boundaries, for a square or cubic box of side `side`:
 """
@@ -252,19 +271,13 @@ function force_pair(x::T,y::T,cutoff,side) where T
 	end
 end
 
-# ╔═╡ 374f239b-6470-40ed-b068-a8ecaace4f09
-plot(
-	0:0.1:10,force_pair.(0.,0:0.1:10,5.),
-	xlabel="Distance",ylabel="Force"
-)
-
 # ╔═╡ 0a5282ee-c88a-4bcc-aca2-477f28e9e04d
 md"""
 Our box has a side of 100:
 """
 
 # ╔═╡ b2a4a505-47ff-40bb-9a6d-a08d91c53217
-side = 100.
+const side = 100.
 
 # ╔═╡ fcff6973-012a-40fc-a618-f6262266287a
 md"""
@@ -278,26 +291,27 @@ While plotting the trajectory, we will wrap the coordinates:
 
 # ╔═╡ 22fb0386-d4fa-47b9-ac31-decf2731cbc1
 md"""
-### Benchmarking
+## Benchmarking
 """
 
 # ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
-@benchmark md(
+@benchmark md($(
 	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
 	v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
+	mass = [ 1.0 for _ in 1:100 ],
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	force_pair = (p1,p2) -> force_pair(p1,p2,cutoff,side)
-)
+	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+)...)
 
 # ╔═╡ 49b1f040-929a-4238-acd9-6554757b592c
 md"""
-## And now the fun begins
+# And now the fun begins
 
 Now we will show the generic code flexibility.
 
-### Running the simulations in 3D
+## Running the simulations in 3D
 
 Not much is needed to just run the simulation in three dimensions. We only need to define our 3D point:
 """
@@ -326,7 +340,7 @@ That is enough such that we can run the simulations in 3D:
 
 # ╔═╡ b6dcb9a3-59e3-4eae-9399-fb072c704f1a
 md"""
-### Automatic error propagation
+## Automatic error propagation
 
 Performing simulations in different dimensions is not the most interesting, or most useful property of generic programming. We can, more interestingly, propagate the error in the positions of the particles, simply by defining a type of particle that carries both the position and the cumulative error. 
 
@@ -365,59 +379,44 @@ end
 # ╔═╡ ecdaaca2-f5d3-496c-960f-df9578268023
 x0 = [ random_point(Point{Float64},-50:50) for _ in 1:100 ]
 
-# ╔═╡ 43e6b146-ee35-40f1-b540-3da22b9e1b1b
-scatter([(x.x, x.y) for x in x0])
-
 # ╔═╡ a2226893-4f32-4ec3-aaef-1c304467452c
 f = similar(x0)
 
 # ╔═╡ 5ad2af1d-5c41-40d8-a451-fd99d9faafc2
-forces!(f, x0, (p1,p2) -> force_pair(p1,p2,cutoff))
+forces!(f, x0, (i,j,p1,p2) -> force_pair(p1,p2,cutoff))
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
-trajectory = md(
-	x0 = [random_point(Point{Float64},-50:50) for _ in 1:100 ], 
-	v0 = [random_point(Point{Float64},-10:10) for _ in 1:100 ], 
+trajectory = md((
+	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
+	v0 = [random_point(Point2D{Float64},-10:10) for _ in 1:100 ], 
+	mass = [ 1.0 for _ in 1:100 ],
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	force_pair = (p1,p2) -> force_pair(p1,p2,cutoff)
-)
-
-# ╔═╡ 505ef5ab-f131-4ab3-a723-795b5eb5dc0f
-@gif for x in trajectory
-  	scatter([ (p.x,p.y) for p in x ], lims=(-1000,1000))
-end
+	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+)...)
 
 # ╔═╡ 985b4ffb-7964-4b50-8c2f-e5f45f352500
-trajectory_periodic = md(
-	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	force_pair = (p1,p2) -> force_pair(p1,p2,cutoff,side)
-)
-
-# ╔═╡ efc586a2-0946-4dc5-ab3a-3902a811f3ad
-@gif for x in trajectory_periodic
-  	scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
-end
+trajectory_periodic = md((
+	x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
+	v0 = [random_point(Point2D{Float64},(-0.1,0.1)) for _ in 1:100 ], 
+	mass = [ 1.0 for _ in 1:100 ],
+	dt = 0.01,
+	nsteps = 10000,
+	isave = 100,
+	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+)...)
 
 # ╔═╡ 0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
-trajectory_periodic_3D = md(
+trajectory_periodic_3D = md((
 	x0 = [random_point(Point3D{Float64},-50:50) for _ in 1:100 ], 
 	v0 = [random_point(Point3D{Float64},-1:1) for _ in 1:100 ], 
+	mass = [ 1.0 for _ in 1:100 ],
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	force_pair = (p1,p2) -> force_pair(p1,p2,cutoff,side)
-)
-
-# ╔═╡ 4a498c18-406f-4437-b378-aa9fdc75b919
-@gif for x in trajectory_periodic_3D
-  	scatter([ wrap.((p.x,p.y,p.z),100) for p in x ], lims=(-60,60))
-end
+	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+)...)
 
 # ╔═╡ 4e97f24c-c237-4117-bc57-e4e88c8fb8d2
 md"""
@@ -425,56 +424,158 @@ Which generates random points carrying an initial uncertainty we defined:
 """
 
 # ╔═╡ b31da90d-7165-42de-b18d-90584affea03
-random_point(Point2D{Measurement{Float64}},-50:50,1e-5)
-
-# ╔═╡ d87c22d1-d595-4d43-ab1c-f28d282a3485
-trajectory_2D_error = md(
-	x0 = [random_point(Point2D{Measurement{Float64}},-50:50,1e-5) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Measurement{Float64}},-1:1,1e-5) for _ in 1:100 ], 
-	dt = 0.1,
-	nsteps = 2000,
-	isave = 10,
-	force_pair = (p1,p2) -> force_pair(p1,p2,cutoff,side)
-)
+random_point(Point2D{Measurement{Float64}},(-50,50),1e-5)
 
 # ╔═╡ 1d6eedfd-d013-4557-9cf2-103f8fb7b72a
 md"""
 The trajectory, of course, looks the same:
 """
 
-# ╔═╡ bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
-@gif for x in trajectory_2D_error
-  	positions = [ wrap.((p.x.val,p.y.val),100) for p in x ]
-	scatter(positions, lims=(-60,60))
-end
-
 # ╔═╡ c003a61d-a434-4d7b-9214-5b52aa044248
 md"""
-But now we have, essentially for free, an estimate of the error of the positions, propagated from the initial uncertainty:
+But now we have an estimate of the error of the positions, propagated from the initial uncertainty:
 """
 
-# ╔═╡ e24ce081-e367-4feb-8a79-66b8654a0b3a
-@gif for x in trajectory_2D_error
-	histogram(
-		[ p.x.err for p in x ],
-		xlabel="Uncertainty in x",ylabel="Number of points",
-		bins=0:1e-4:25e-4,ylims=[0,50]
-	)
+# ╔═╡ 63eb391f-0238-434a-bc3a-2fa8ed41448e
+md"""
+Perhaps this is more interesting to see in a planetary trajectory:
+"""
+
+# ╔═╡ 7b9bb0fd-34a5-42e1-bc35-7259447b73d0
+function gravitational_force(i,j,x,y,mass)
+	G = 0.00049823382528 # MKm³ / (10²⁴kg days²)
+	dr = y - x
+	r = norm(dr)
+	return -G*mass[i]*mass[j]*dr/r^3
 end
+
+# ╔═╡ 6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
+md"""
+Note that now we need the indexes of the particles to be able to pass the information of their masses. 
+
+A set of planetary positions and velocities is something that we have to obtain [experimentaly](https://nssdc.gsfc.nasa.gov/planetary/factsheet/). Here, the distance units $10^6$ km), and time is in days. Thus, velocities are in MKm per day.
+
+The uncertainty of the positions will be taken as the diameter of each planet. In this illustrative example we will not add uncertainties to the velcities. 
+"""
+
+# ╔═╡ c91862dd-498a-4712-8e3d-b77e088cd470
+planets_x0 = [
+	Point2D(measurement(  0.0,   1.39), measurement(0.,   1.39)), # "Sun"
+	Point2D(measurement( 57.9,  4.879e-3), measurement(0.,  4.879e-3)), # "Mercury"
+	Point2D(measurement(108.2, 12.104e-3), measurement(0., 12.104e-3)), # "Venus"
+	Point2D(measurement(149.6, 12.756e-3), measurement(0., 12.756e-3)), # "Earth"
+	Point2D(measurement(227.9,  6.792e-3), measurement(0.,  6.792e-3)), # "Mars"
+]
+
+# ╔═╡ a08d6e6d-ddc4-40aa-b7c4-93ea03191415
+planets_v0 = [ 
+	Point2D(measurement(0., 0.), measurement(  0.0,   0.)), # "Sun"
+	Point2D(measurement(0., 0.), measurement( 4.10,   0.)), # "Mercury"
+	Point2D(measurement(0., 0.), measurement( 3.02,   0.)), # "Venus"
+	Point2D(measurement(0., 0.), measurement( 2.57,   0.)), # "Earth"
+	Point2D(measurement(0., 0.), measurement( 2.08,   0.)), # "Mars"	
+]
+
+# ╔═╡ a356e2cc-1cb1-457a-986c-998cf1efe008
+md"""
+And the masses are given in units of $10^{24}$ kg:
+"""
+
+# ╔═╡ 57141f7c-9261-4dc5-98e4-b136a15f86fc
+const masses = [ 1.99e6, 0.330, 4.87, 5.97, 0.642 ]
+
+# ╔═╡ 055e32d7-073c-40db-a267-750636b9f786
+md"""
+Let us see the planets orbiting the sun:
+"""
+
+# ╔═╡ aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
+trajectory_planets = md((
+	x0 = planets_x0, 
+	v0 = planets_v0, 
+	mass = masses,
+	dt = 1, # days
+	nsteps = 365, # ten earth years
+	isave = 1, # save every 100 days
+	force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+)...)
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
 md"""
-## Some notebook options and setup
+# Some notebook options and setup
 """
 
 # ╔═╡ 2a2e9155-1c77-46fd-8502-8431573f94d0
 md"""
-### Default plot setup
+## Default plot setup
 """
+
+# ╔═╡ a9981931-4cc9-4d16-a6d2-34b4071a84d7
+const build_plots = true
+
+# ╔═╡ 374f239b-6470-40ed-b068-a8ecaace4f09
+build_plots && plot(
+	0:0.1:1.2*cutoff,force_pair.(0.,0:0.1:1.2*cutoff,cutoff),
+	xlabel="Distance",ylabel="Force"
+)
+
+# ╔═╡ 43e6b146-ee35-40f1-b540-3da22b9e1b1b
+build_plots && scatter([(x.x, x.y) for x in x0])
+
+# ╔═╡ 505ef5ab-f131-4ab3-a723-795b5eb5dc0f
+build_plots && @gif for x in trajectory
+  	scatter([ (p.x,p.y) for p in x ], lims=(-1000,1000))
+end
+
+# ╔═╡ efc586a2-0946-4dc5-ab3a-3902a811f3ad
+build_plots && @gif for x in trajectory_periodic
+  	scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
+end
+
+# ╔═╡ 4a498c18-406f-4437-b378-aa9fdc75b919
+build_plots && @gif for x in trajectory_periodic_3D
+  	scatter([ wrap.((p.x,p.y,p.z),100) for p in x ], lims=(-60,60))
+end
+
+# ╔═╡ d87c22d1-d595-4d43-ab1c-f28d282a3485
+build_plots && ( trajectory_2D_error = md((
+	x0 = [random_point(Point2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
+	v0 = [random_point(Point2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
+	mass = [ 1.0 for _ in 1:100 ],
+	dt = 0.1,
+	nsteps = 1000,
+	isave = 10,
+	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+)...) )
+
+# ╔═╡ bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
+build_plots && @gif for x in trajectory_2D_error
+  	positions = [ wrap.((p.x.val,p.y.val),100) for p in x ]
+	scatter(positions, lims=(-60,60))
+end
+
+# ╔═╡ e24ce081-e367-4feb-8a79-66b8654a0b3a
+build_plots && @gif for x in trajectory_2D_error
+	histogram(
+		[ p.x.err for p in x ],
+		xlabel="Uncertainty in x",ylabel="Number of points",
+		bins=0:1e-4:20e-4,ylims=[0,50]
+	)
+end
+
+# ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
+build_plots && @gif for (step,x) in pairs(trajectory_planets)
+	colors = [ :yellow, :grey, :brown, :blue, :red ]
+  	positions = [ (p.x.val,p.y.val) for p in x ]
+	xerr = [ p.x.err for p in x ]
+	yerr = [ p.y.err for p in x ] 
+	scatter(positions,lims=[-250,250], color=colors, xerror=xerr, yerror=yerr)
+	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+end
 
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
-### Table of Contents
+## Table of Contents
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -485,6 +586,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
@@ -1333,12 +1435,13 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╟─4b484cf6-4888-4f04-b3fd-94862822b0c0
+# ╠═4b484cf6-4888-4f04-b3fd-94862822b0c0
 # ╠═8c444ee4-8c77-413a-bbeb-9e5ae2428876
 # ╟─a0de01b5-779a-48c0-8d61-12b02a5f527e
 # ╠═414790ef-a592-418d-b116-9864b76530bf
 # ╟─dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 # ╠═0f52365d-34f4-46ed-923e-3ea31c6db0ca
+# ╠═b5c09cd3-6063-4a36-96cd-2d128aa11b82
 # ╠═374f239b-6470-40ed-b068-a8ecaace4f09
 # ╟─7719b317-e85b-4583-b401-a8614d4b2373
 # ╠═f58769a6-a656-42a3-8bc6-c204d4cfd897
@@ -1346,12 +1449,15 @@ version = "0.9.1+5"
 # ╠═ecdaaca2-f5d3-496c-960f-df9578268023
 # ╠═43e6b146-ee35-40f1-b540-3da22b9e1b1b
 # ╠═a2226893-4f32-4ec3-aaef-1c304467452c
-# ╠═b5c09cd3-6063-4a36-96cd-2d128aa11b82
 # ╟─dd9e4332-2908-40ef-b461-6b571df56cf4
 # ╠═5ad2af1d-5c41-40d8-a451-fd99d9faafc2
+# ╠═0d964841-7764-48a4-9a6d-0b017ce4a90e
+# ╠═c56e1910-facc-4595-81e8-e2d5d8c4e8f4
+# ╠═d54598a0-1190-402c-8b51-2d09ca47cdf0
 # ╟─b5206dd5-1f46-4437-929b-efd68393b12b
 # ╠═eb5dc224-1491-11ec-1cae-d51c93cd292c
 # ╟─66c7d960-7e05-4613-84e8-2a40fe40dc3d
+# ╟─e717a8d9-ccfb-4f89-b2a2-f244f108b48d
 # ╠═3755a4f3-1842-4de2-965e-d294c06c54c7
 # ╠═505ef5ab-f131-4ab3-a723-795b5eb5dc0f
 # ╟─eab7b195-64d5-4587-8687-48a673ab091b
@@ -1393,9 +1499,21 @@ version = "0.9.1+5"
 # ╠═bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
 # ╟─c003a61d-a434-4d7b-9214-5b52aa044248
 # ╠═e24ce081-e367-4feb-8a79-66b8654a0b3a
+# ╟─63eb391f-0238-434a-bc3a-2fa8ed41448e
+# ╠═7b9bb0fd-34a5-42e1-bc35-7259447b73d0
+# ╠═6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
+# ╠═c91862dd-498a-4712-8e3d-b77e088cd470
+# ╠═a08d6e6d-ddc4-40aa-b7c4-93ea03191415
+# ╟─a356e2cc-1cb1-457a-986c-998cf1efe008
+# ╠═57141f7c-9261-4dc5-98e4-b136a15f86fc
+# ╟─055e32d7-073c-40db-a267-750636b9f786
+# ╠═aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
+# ╠═1067527e-76b7-4331-b3ab-efd72fb99dfc
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
+# ╠═febe8c06-b3aa-4db1-a3ea-fdc2a81bdebd
+# ╠═a9981931-4cc9-4d16-a6d2-34b4071a84d7
 # ╟─b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 # ╠═a756dd18-fac6-4527-944e-c16d8cc4bf95
 # ╟─00000000-0000-0000-0000-000000000001
