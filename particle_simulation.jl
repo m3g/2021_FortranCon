@@ -13,6 +13,12 @@ using BenchmarkTools
 # ╔═╡ d9bff7a0-7ce6-447b-ba76-120c691f6c0a
 using Measurements
 
+# ╔═╡ d6564250-f646-40de-9463-a956af1a5b1d
+using ForwardDiff
+
+# ╔═╡ 84e305e9-6ab9-4005-a295-a12c4eff68c5
+using Optim
+
 # ╔═╡ 7c792b6b-b6ee-4e30-88d5-d0b8064f2734
 begin
 	using Plots
@@ -294,16 +300,12 @@ md"""
 ## Benchmarking
 """
 
-# ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
-@benchmark md($(
-	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
-)...)
+# ╔═╡ 2a3e7257-63ad-4761-beda-cec18b91f99c
+md"""
+
+Something of the order of `200ms` and `187KiB` of allocations does not seem bad, but it doesn't mean anything either. What is interesting to point here is just that this code, compared to ahead-of-time compiled language like Fortran, is completely comparable in terms of performance, as [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/benchmark_vs_fortran) shows. 
+
+"""
 
 # ╔═╡ 49b1f040-929a-4238-acd9-6554757b592c
 md"""
@@ -355,10 +357,7 @@ using `Measurments`  we do not need to change anything in our previous code, but
 """
 
 # ╔═╡ a0e39d66-e328-4b61-86d4-99df6b832b7a
-p = Point2D(
-	measurement(rand(),1e-5),
-	measurement(rand(),1e-5)
-)
+p = Point2D( rand() ± 1e-5, rand() ± 1e-5 )
 
 # ╔═╡ 418f31bb-81d5-459b-b402-4fd4e3f4ab27
 md"""
@@ -367,11 +366,9 @@ We need to redefine your initial random point generator only:
 
 # ╔═╡ 05402cbd-78c6-4234-8680-c351c8c37778
 function random_point(::Type{Point2D{Measurement{T}}},range,uncertainty) where T	
-	ux = uncertainty*rand()
-	uy = uncertainty*rand()
 	p = Point2D(
-		measurement(range[begin] + rand(T)*(range[end]-range[begin]), ux),
-		measurement(range[begin] + rand(T)*(range[end]-range[begin]), uy)
+		range[begin] + rand(T)(range[end]-range[begin]) ± uncertainty*rand(),
+		range[begin] + rand(T)(range[end]-range[begin]) ± uncertainty*rand()
 	)
 	return p
 end
@@ -404,6 +401,17 @@ trajectory_periodic = md((
 	dt = 0.01,
 	nsteps = 10000,
 	isave = 100,
+	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+)...)
+
+# ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
+@benchmark md($(
+	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
+	v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
+	mass = [ 1.0 for _ in 1:100 ],
+	dt = 0.1,
+	nsteps = 1000,
+	isave = 10,
 	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
 )...)
 
@@ -495,10 +503,126 @@ trajectory_planets = md((
 	v0 = planets_v0, 
 	mass = masses,
 	dt = 1, # days
-	nsteps = 365, # ten earth years
-	isave = 1, # save every 100 days
+	nsteps = 2*365, # two earth years
+	isave = 1, # save every day
 	force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
 )...)
+
+# ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
+md"""
+One thing I don't like, though, is that in two years the earth appeared to have made much less than to complete revolutions around the sun. Something is wrong with our data. Can we improve that?
+"""
+
+# ╔═╡ 827bda6f-87d4-4d36-8d89-f144f4595240
+md"""
+## We can differentiate everything!
+
+Perhaps astoningshly (at least for me), our simulation is completely differentiable. That means that we can tune the parameters of the simulation, and the data, using optimization algorithms that require derivatives. 
+
+Here we speculate that what was wrong with our data was that the initial position of the earth was somewhat out of place. That caused the earth orbit to be slower than it should.
+
+We will define, then, an objective function which returns the displacement of the earth relative to its initial position (at day one) after one year. Our goal is that after one year the earth returns to its initial position.
+"""
+
+# ╔═╡ 0103b69a-2505-42f8-8df4-d08759eba077
+function error_in_orbit(x::T=149.6) where T
+	x0 = [
+		Point2D( zero(T), zero(T)), # "Sun"
+		Point2D(      x,  zero(T))  # "Earth"
+	]
+	v0 = [ 
+		Point2D( zero(T),     zero(T)), # "Sun"
+		Point2D( zero(T), 2.57*one(T))  # "Earth"
+	]
+	masses = [ 1.99e6*one(T), 5.97*one(T) ]
+	last_position = md((
+		x0 = x0, 
+		v0 = v0, 
+		mass = masses,
+		dt = 1, # days
+		nsteps = 365, # one earth year
+		isave = 365, # save only last point
+		force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+	)...)
+	return norm(last_position[end][2] - x0[2])
+end
+
+# ╔═╡ fda6171c-9675-4f2e-b226-7ccf100529cd
+error_in_orbit()
+
+# ╔═╡ 107aec28-ecb5-4007-95e5-25d0a7f0c465
+ForwardDiff.derivative(error_in_orbit,149.6)
+
+# ╔═╡ b8320f78-323c-49a9-a9f9-2748d19ecb35
+error_derivative(x) = ForwardDiff.derivative(error_in_orbit,x)
+
+# ╔═╡ 535716e6-9c1c-4324-a4cd-b1214df3c01d
+function gradient_descent(x,f,g,tol,maxtrial)
+	itrial = 0
+	step = 1.0
+	xbest = x0
+	fbest = f(x)
+	grad = g(x)
+	while (abs(grad) > tol) && (itrial < maxtrial)
+		xtrial = x - grad*step
+		if f(xtrial) > f(x)
+			step = step / 2
+		else
+			x = xtrial
+			grad = g(x)
+			step = 1.0
+			if f(x) < fbest
+				xbest = x
+				fbest = f(x)
+			end
+		end
+		itrial += 1
+	end 
+	return x, grad, itrial
+end
+
+# ╔═╡ 931a9c5f-8f91-4e88-956b-50c0efc9c58b
+best_x0 = gradient_descent(149.6,error_in_orbit,error_derivative,1e-4,1000)
+
+# ╔═╡ 7658a32c-d3da-4ec9-9d96-0d30bb18f08c
+error_in_orbit(best_x0[1])
+
+# ╔═╡ e61981d5-5448-45e9-81dc-320ac87ba813
+md"""
+Seems that it worked! Let us see our trajectory now with the new initial condition:
+"""
+
+# ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
+function earth_trajectory(x::T) where T
+	x0 = [
+		Point2D( 0., 0.), # "Sun"
+		Point2D(  x, 0.)  # "Earth"
+	]
+	v0 = [ 
+		Point2D( 0., 0.  ), # "Sun"
+		Point2D( 0., 2.57), # "Earth"
+	]
+	masses = [ 1.99e6, 5.97 ]
+	earth_trajectory = md((
+		x0 = x0, 
+		v0 = v0, 
+		mass = masses,
+		dt = 1, # days
+		nsteps = 365, # one earth year
+		isave = 1, # save only last point
+		force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+	)...)
+	return earth_trajectory
+end
+
+# ╔═╡ 31e1bb51-c531-4c4a-8634-5caafb7e9e51
+earth_traj_0 = earth_trajectory(149.6)
+
+# ╔═╡ b0b81da4-6788-45c4-b618-188a02b5e09c
+earth_traj_best = earth_trajectory(best_x0[1])
+
+# ╔═╡ 8e618602-0c65-448f-adae-2c80e7cdd73e
+earth_traj_0[end][2], earth_traj_best[end][2]
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
 md"""
@@ -573,6 +697,27 @@ build_plots && @gif for (step,x) in pairs(trajectory_planets)
 	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
+# ╔═╡ 4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
+build_plots && @gif for step in eachindex(earth_traj_best)
+	colors = [ :yellow, :blue ]
+  	positions0 = [ (p.x,p.y) for p in earth_traj_0[step] ] 
+	positions_best = [ (p.x,p.y) for p in earth_traj_best[step] ]
+	scatter(positions0,lims=[-250,250], color=colors, alpha=0.5)
+	scatter!(positions_best,lims=[-250,250], color=colors)
+	scatter!(
+		(earth_traj_best[1][2].x,earth_traj_best[1][2].y),
+		color=:white,alpha=0.5,
+		markersize=10
+	)
+	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+end
+
+# ╔═╡ 043d89a4-ac5d-49ac-9820-b35c5ee967bc
+begin 
+	reset_element(x::Measurement{T}) where T = zero(T) ± x.err
+	reset_element(x) = zero(x)
+end
+
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
 ## Table of Contents
@@ -582,8 +727,10 @@ md"""
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -591,7 +738,9 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 BenchmarkTools = "~1.1.4"
+ForwardDiff = "~0.10.19"
 Measurements = "~2.6.0"
+Optim = "~1.4.1"
 Plots = "~1.21.3"
 PlutoUI = "~0.7.9"
 StaticArrays = "~1.2.12"
@@ -609,6 +758,12 @@ version = "3.3.1"
 
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
+
+[[ArrayInterface]]
+deps = ["IfElse", "LinearAlgebra", "Requires", "SparseArrays", "Static"]
+git-tree-sha1 = "d84c956c4c0548b4caf0e4e96cf5b6494b5b1529"
+uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+version = "3.1.32"
 
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -640,6 +795,12 @@ git-tree-sha1 = "f641eb0a4f00c343bbc32346e1217b86f3ce9dad"
 uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 version = "0.5.1"
 
+[[ChainRulesCore]]
+deps = ["Compat", "LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "4ce9393e871aca86cc457d9f66976c3da6902ea7"
+uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+version = "1.4.0"
+
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random"]
 git-tree-sha1 = "9995eb3977fbf67b86d0a0a0508e83017ded03f2"
@@ -657,6 +818,12 @@ deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
 git-tree-sha1 = "417b0ed7b8b838aa6ca0a87aadf1bb9eb111ce40"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.12.8"
+
+[[CommonSubexpressions]]
+deps = ["MacroTools", "Test"]
+git-tree-sha1 = "7b8a93dba8af7e3b42fecabf646260105ac373f7"
+uuid = "bbf7d656-a473-5ed7-a52c-81e309532950"
+version = "0.3.0"
 
 [[Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "SHA", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
@@ -698,9 +865,27 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
+[[DiffResults]]
+deps = ["StaticArrays"]
+git-tree-sha1 = "c18e98cba888c6c25d1c3b048e4b3380ca956805"
+uuid = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+version = "1.0.3"
+
+[[DiffRules]]
+deps = ["NaNMath", "Random", "SpecialFunctions"]
+git-tree-sha1 = "3ed8fa7178a10d1cd0f1ca524f249ba6937490c0"
+uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
+version = "1.3.0"
+
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+
+[[DocStringExtensions]]
+deps = ["LibGit2"]
+git-tree-sha1 = "a32185f5428d3986f47c2ab78b1f216d5e6cc96f"
+uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+version = "0.8.5"
 
 [[Downloads]]
 deps = ["ArgTools", "LibCURL", "NetworkOptions"]
@@ -730,6 +915,18 @@ git-tree-sha1 = "d8a578692e3077ac998b50c0217dfd67f21d1e5f"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.0+0"
 
+[[FillArrays]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
+git-tree-sha1 = "caf289224e622f518c9dbfe832cdafa17d7c80a6"
+uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
+version = "0.12.4"
+
+[[FiniteDiff]]
+deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
+git-tree-sha1 = "8b3c09b56acaf3c0e581c66638b85c8650ee9dca"
+uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
+version = "2.8.1"
+
 [[FixedPointNumbers]]
 deps = ["Statistics"]
 git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
@@ -747,6 +944,12 @@ deps = ["Printf"]
 git-tree-sha1 = "8339d61043228fdd3eb658d86c926cb282ae72a8"
 uuid = "59287772-0a20-5a39-b81b-1366585eb4c0"
 version = "0.4.2"
+
+[[ForwardDiff]]
+deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "NaNMath", "Printf", "Random", "SpecialFunctions", "StaticArrays"]
+git-tree-sha1 = "b5e930ac60b613ef3406da6d4f42c35d8dc51419"
+uuid = "f6369f11-7733-5829-9624-2563aa707210"
+version = "0.10.19"
 
 [[FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
@@ -819,6 +1022,11 @@ git-tree-sha1 = "8a954fed8ac097d5be04921d595f741115c1b2ad"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+0"
 
+[[IfElse]]
+git-tree-sha1 = "28e837ff3e7a6c3cdb252ce49fb412c8eb3caeef"
+uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
+version = "0.1.0"
+
 [[IniFile]]
 deps = ["Test"]
 git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
@@ -828,6 +1036,11 @@ version = "0.5.0"
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+
+[[IrrationalConstants]]
+git-tree-sha1 = "f76424439413893a832026ca355fe273e93bce94"
+uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
+version = "0.1.0"
 
 [[IterTools]]
 git-tree-sha1 = "05110a2ab1fc5f932622ffea2a003221f4782c18"
@@ -947,9 +1160,21 @@ git-tree-sha1 = "7f3efec06033682db852f8b3bc3c1d2b0a0ab066"
 uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
 version = "2.36.0+0"
 
+[[LineSearches]]
+deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
+git-tree-sha1 = "f27132e551e959b3667d8c93eae90973225032dd"
+uuid = "d3d80556-e9d4-5f37-9878-2ab0fcc64255"
+version = "7.1.1"
+
 [[LinearAlgebra]]
 deps = ["Libdl"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[[LogExpFunctions]]
+deps = ["ChainRulesCore", "DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
+git-tree-sha1 = "34dc30f868e368f8a17b728a1238f3fcda43931a"
+uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
+version = "0.3.3"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -997,6 +1222,12 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 [[MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 
+[[NLSolversBase]]
+deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
+git-tree-sha1 = "144bab5b1443545bc4e791536c9f1eacb4eed06a"
+uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
+version = "7.8.1"
+
 [[NaNMath]]
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
@@ -1017,6 +1248,18 @@ git-tree-sha1 = "15003dcb7d8db3c6c857fda14891a539a8f2705a"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
 version = "1.1.10+0"
 
+[[OpenSpecFun_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "13652491f6856acfd2db29360e1bbcd4565d04f1"
+uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
+version = "0.5.5+0"
+
+[[Optim]]
+deps = ["Compat", "FillArrays", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
+git-tree-sha1 = "7863df65dbb2a0fa8f85fcaf0a41167640d2ebed"
+uuid = "429524aa-4258-5aef-a3af-852621145aeb"
+version = "1.4.1"
+
 [[Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "51a08fb14ec28da2ec7a927c4337e4332c2a4720"
@@ -1033,6 +1276,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "b2a7af664e098055a7529ad1a900ded962bca488"
 uuid = "2f80f16e-611a-54ab-bc61-aa92de5b98fc"
 version = "8.44.0+0"
+
+[[Parameters]]
+deps = ["OrderedCollections", "UnPack"]
+git-tree-sha1 = "2276ac65f1e236e0a6ea70baff3f62ad4c625345"
+uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+version = "0.12.2"
 
 [[Parsers]]
 deps = ["Dates"]
@@ -1073,6 +1322,12 @@ deps = ["Base64", "Dates", "InteractiveUtils", "JSON", "Logging", "Markdown", "R
 git-tree-sha1 = "44e225d5837e2a2345e69a1d1e01ac2443ff9fcb"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 version = "0.7.9"
+
+[[PositiveFactorizations]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
+uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
+version = "0.2.4"
 
 [[Preferences]]
 deps = ["TOML"]
@@ -1155,6 +1410,18 @@ version = "1.0.1"
 deps = ["LinearAlgebra", "Random"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
+[[SpecialFunctions]]
+deps = ["ChainRulesCore", "LogExpFunctions", "OpenSpecFun_jll"]
+git-tree-sha1 = "a322a9493e49c5f3a10b50df3aedaf1cdb3244b7"
+uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
+version = "1.6.1"
+
+[[Static]]
+deps = ["IfElse"]
+git-tree-sha1 = "a8f30abc7c64a39d389680b74e749cf33f872a70"
+uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
+version = "0.3.3"
+
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
 git-tree-sha1 = "3240808c6d463ac46f1c1cd7638375cd22abbccb"
@@ -1219,6 +1486,11 @@ version = "1.3.0"
 [[UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+
+[[UnPack]]
+git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
+uuid = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+version = "1.0.2"
 
 [[Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
@@ -1435,7 +1707,7 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╠═4b484cf6-4888-4f04-b3fd-94862822b0c0
+# ╟─4b484cf6-4888-4f04-b3fd-94862822b0c0
 # ╠═8c444ee4-8c77-413a-bbeb-9e5ae2428876
 # ╟─a0de01b5-779a-48c0-8d61-12b02a5f527e
 # ╠═414790ef-a592-418d-b116-9864b76530bf
@@ -1480,6 +1752,7 @@ version = "0.9.1+5"
 # ╟─22fb0386-d4fa-47b9-ac31-decf2731cbc1
 # ╠═d42f842d-6c2a-40db-b0c4-e936244a9e7c
 # ╠═1ad401b5-20b2-489b-b2aa-92f729b1d725
+# ╟─2a3e7257-63ad-4761-beda-cec18b91f99c
 # ╟─49b1f040-929a-4238-acd9-6554757b592c
 # ╠═26d5c6e9-a903-4792-a0e0-dec1a2e86a01
 # ╠═1ce41841-1ca7-43e4-a08a-21142e29ed93
@@ -1501,7 +1774,7 @@ version = "0.9.1+5"
 # ╠═e24ce081-e367-4feb-8a79-66b8654a0b3a
 # ╟─63eb391f-0238-434a-bc3a-2fa8ed41448e
 # ╠═7b9bb0fd-34a5-42e1-bc35-7259447b73d0
-# ╠═6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
+# ╟─6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
 # ╠═c91862dd-498a-4712-8e3d-b77e088cd470
 # ╠═a08d6e6d-ddc4-40aa-b7c4-93ea03191415
 # ╟─a356e2cc-1cb1-457a-986c-998cf1efe008
@@ -1509,11 +1782,29 @@ version = "0.9.1+5"
 # ╟─055e32d7-073c-40db-a267-750636b9f786
 # ╠═aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
 # ╠═1067527e-76b7-4331-b3ab-efd72fb99dfc
+# ╟─c4344e64-aa22-4328-a97a-71e44bcd289f
+# ╟─827bda6f-87d4-4d36-8d89-f144f4595240
+# ╠═0103b69a-2505-42f8-8df4-d08759eba077
+# ╠═fda6171c-9675-4f2e-b226-7ccf100529cd
+# ╠═d6564250-f646-40de-9463-a956af1a5b1d
+# ╠═107aec28-ecb5-4007-95e5-25d0a7f0c465
+# ╠═84e305e9-6ab9-4005-a295-a12c4eff68c5
+# ╠═b8320f78-323c-49a9-a9f9-2748d19ecb35
+# ╠═535716e6-9c1c-4324-a4cd-b1214df3c01d
+# ╠═931a9c5f-8f91-4e88-956b-50c0efc9c58b
+# ╠═7658a32c-d3da-4ec9-9d96-0d30bb18f08c
+# ╟─e61981d5-5448-45e9-81dc-320ac87ba813
+# ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
+# ╠═31e1bb51-c531-4c4a-8634-5caafb7e9e51
+# ╠═b0b81da4-6788-45c4-b618-188a02b5e09c
+# ╠═8e618602-0c65-448f-adae-2c80e7cdd73e
+# ╠═4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
 # ╠═febe8c06-b3aa-4db1-a3ea-fdc2a81bdebd
 # ╠═a9981931-4cc9-4d16-a6d2-34b4071a84d7
+# ╠═043d89a4-ac5d-49ac-9820-b35c5ee967bc
 # ╟─b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 # ╠═a756dd18-fac6-4527-944e-c16d8cc4bf95
 # ╟─00000000-0000-0000-0000-000000000001
