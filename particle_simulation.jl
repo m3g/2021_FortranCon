@@ -16,13 +16,16 @@ using Measurements
 # ╔═╡ d6564250-f646-40de-9463-a956af1a5b1d
 using ForwardDiff
 
+# ╔═╡ d2f4d622-8e35-4be3-b421-39b28a748cab
+using CellListMap
+
 # ╔═╡ 7c792b6b-b6ee-4e30-88d5-d0b8064f2734
 begin
 	using Plots
 	plot_font = "Computer Modern"
 	default(
 		fontfamily=plot_font,
-		linewidth=2, framestyle=:box, label=nothing, grid=false,
+		linewidth=2, framestyle=:box, label=:none, grid=false,
 		size=(400,400)
 	)	
 end
@@ -112,6 +115,35 @@ $v(t+dt) = v(t) + a(t)*dt$
 ## The actual simulation code is as short:
 """
 
+# ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
+function md(
+	x0::Vector{T},
+	v0::Vector{T},
+	mass,dt,nsteps,isave,forces!::F
+) where {T,F}
+	x = copy(x0)
+	v = copy(v0)
+	a = similar(x0)
+	f = similar(x0)
+	trajectory = [ copy(x0) ] # will store the trajectory
+	for step in 1:nsteps
+		# Compute forces
+		forces!(f,x)
+		# Accelerations
+		@. a = f / mass
+		# Update positions
+		@. x = x + v*dt + a*dt^2/2
+		# Update velocities
+		@. v = v + a*dt
+		# Save if required
+		if mod(step,isave) == 0
+			println("Saved trajectory at step: ",step)
+			push!(trajectory,copy(x))
+		end
+	end
+	return trajectory
+end
+
 # ╔═╡ 66c7d960-7e05-4613-84e8-2a40fe40dc3d
 md"""
 ## Let us run the simulation!
@@ -186,7 +218,7 @@ md"""
 # ╔═╡ 2a3e7257-63ad-4761-beda-cec18b91f99c
 md"""
 
-Something of the order of `200ms` and `187KiB` of allocations does not seem bad, but it doesn't mean anything either. What is interesting to point here is just that this code, compared to ahead-of-time compiled language like Fortran, is completely comparable in terms of performance, as [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/benchmark_vs_fortran) shows. 
+Something of the order of `200ms` and `200KiB` of allocations does not seem bad, but it doesn't mean anything either. What is interesting to point here is just that this code, compared to ahead-of-time compiled language like Fortran, is completely comparable in terms of performance, as [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/benchmark_vs_fortran) shows. 
 
 """
 
@@ -263,8 +295,7 @@ function force_pair(x::T,y::T,cutoff) where T
 	if d > cutoff
 		return zero(T)
 	else
-		Δv = Δv / d
-		return Δv*(d - cutoff)^2
+		return (Δv/d)*(d - cutoff)^2
 	end
 end
 
@@ -282,35 +313,6 @@ function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
 	return f
 end
 
-# ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
-function md(
-	x0::Vector{T},
-	v0::Vector{T},
-	mass,dt,nsteps,isave,force_pair::F
-) where {T,F}
-	x = copy(x0)
-	v = copy(v0)
-	a = similar(x0)
-	f = similar(x0)
-	trajectory = [ copy(x0) ] # will store the trajectory
-	for step in 1:nsteps
-		# Compute forces
-		forces!(f,x,force_pair)
-		# Accelerations
-		@. a = f / mass
-		# Update positions
-		@. x = x + v*dt + a*dt^2/2
-		# Update velocities
-		@. v = v + a*dt
-		# Save if required
-		if mod(step,isave) == 0
-			println("Saved trajectory at step: ",step)
-			push!(trajectory,copy(x))
-		end
-	end
-	return trajectory
-end
-
 # ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
 x0 = [ Point2D(100*rand(),100*rand()) for _ in 1:100] 
 
@@ -326,7 +328,7 @@ function wrap(x,side)
 		x += side
 	end
 	return x
-end		
+end
 
 # ╔═╡ 0967b90d-ac88-476d-a57a-7c38dfa82204
 function force_pair(x::T,y::T,cutoff,side) where T
@@ -339,9 +341,6 @@ function force_pair(x::T,y::T,cutoff,side) where T
 		return Δv*(d - cutoff)^2
 	end
 end
-
-# ╔═╡ 5ad2af1d-5c41-40d8-a451-fd99d9faafc2
-forces!(f, x0, (i,j,p1,p2) -> force_pair(p1,p2,cutoff))
 
 # ╔═╡ 1ce41841-1ca7-43e4-a08a-21142e29ed93
 function random_point(::Type{Point3D{T}},range) where T 
@@ -391,24 +390,24 @@ end
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
 trajectory = md((
-	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},-10:10) for _ in 1:100 ], 
+	x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
+	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
 	mass = [ 1.0 for _ in 1:100 ],
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff))
 )...)
 
 # ╔═╡ 985b4ffb-7964-4b50-8c2f-e5f45f352500
 trajectory_periodic = md((
 	x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},(-0.1,0.1)) for _ in 1:100 ], 
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.01,
-	nsteps = 10000,
-	isave = 100,
-	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
+	mass = [ 10.0 for _ in 1:100 ],
+	dt = 0.1,
+	nsteps = 1000,
+	isave = 10,
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
@@ -419,7 +418,7 @@ trajectory_periodic = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
@@ -430,7 +429,7 @@ trajectory_periodic_3D = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 4e97f24c-c237-4117-bc57-e4e88c8fb8d2
@@ -512,18 +511,23 @@ trajectory_planets = md((
 	dt = 1, # days
 	nsteps = 2*365, # two earth years
 	isave = 1, # save every day
-	force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+	forces! = (f,x) -> forces!(
+		f,x, (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+	)
 )...)
 
 # ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
 @gif for (step,x) in pairs(trajectory_planets)
-	colors = [ :yellow, :grey, :brown, :blue, :red ]
+	c = [ :yellow, :grey, :brown, :blue, :red ]
   	positions = [ (p.x.val,p.y.val) for p in x ]
 	xerr = [ p.x.err for p in x ]
 	yerr = [ p.y.err for p in x ] 
-	scatter(positions,lims=[-250,250], color=colors, xerror=xerr, yerror=yerr)
+	scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
 	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
+
+# ╔═╡ 1b8178f5-5fb6-4e6b-aec5-b519095950bd
+[ (p.x.err,p.y.err) for p in trajectory_planets[end] ]
 
 # ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
 md"""
@@ -559,7 +563,9 @@ function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
 		dt = 1, # days
 		nsteps = nsteps, # one earth year
 		isave = isave, # save only last point
-		force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+		forces! = (f,x) -> forces!(f,x, 
+			(i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+		)
 	)...)
 	return trajectory
 end
@@ -621,8 +627,45 @@ earth_traj_0 = earth_orbit(149.6)
 # ╔═╡ b0b81da4-6788-45c4-b618-188a02b5e09c
 earth_traj_best = earth_orbit(best_x0[1])
 
-# ╔═╡ 8e618602-0c65-448f-adae-2c80e7cdd73e
-earth_traj_0[end][2], earth_traj_best[end][2]
+# ╔═╡ 826693ff-9a9b-46b1-aeb3-767a5e6f9441
+md"""
+# Accelerating with CellListMap.jl
+"""
+
+# ╔═╡ 7600c6dc-769e-4c77-8526-281a1bcec079
+x0_large = [ Point2D(316.2*rand(),316.2*rand()) for _ in 1:1000 ] 
+
+# ╔═╡ 7cbc7036-562e-42c1-a15f-31eae3b50b87
+md"""
+This is already too slow for running live. It takes ~30s in my computer
+"""
+
+# ╔═╡ 29dbc47b-3697-4fdf-8f34-890ab4d0cdae
+trajectory_periodic_large = md((
+	x0 = x0_large, 
+	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:1000 ], 
+	mass = [ 10.0 for _ in 1:1000 ],
+	dt = 0.1,
+	nsteps = 1000,
+	isave = 10,
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff,316.2))
+)...)
+
+# ╔═╡ 929dc88f-15e2-4910-8ed5-8b960e3138fa
+function forces_fast!(
+	f::Vector{T},
+	x::Vector{T},
+	force_pair::F,
+	box::Box,cl::CellList,
+) where {T,F}
+	cl = UpdateCellList!(x,box,cl)
+	fill!(f,zero(T))
+	map_pairwise!(
+		(i,j,x,y,d2,f) -> force_pair(i,j,x,y,d2,f),
+		f, box, cl
+	)
+	return f
+end
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
 md"""
@@ -657,13 +700,15 @@ build_plots && plot(
 build_plots && scatter([(x.x, x.y) for x in x0])
 
 # ╔═╡ 505ef5ab-f131-4ab3-a723-795b5eb5dc0f
-build_plots && @gif for x in trajectory
-  	scatter([ (p.x,p.y) for p in x ], lims=(-1000,1000))
+build_plots && @gif for (step,x) in pairs(trajectory)
+  	scatter([ (p.x,p.y) for p in x ], lims=(-250,250))
+	annotate!(130,-210,text("step: $step",plot_font,12,:left))
 end
 
 # ╔═╡ efc586a2-0946-4dc5-ab3a-3902a811f3ad
-build_plots && @gif for x in trajectory_periodic
+build_plots && @gif for (step,x) in pairs(trajectory_periodic)
   	scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
+	annotate!(25,-50,text("step: $step",plot_font,12,:left))
 end
 
 # ╔═╡ 4a498c18-406f-4437-b378-aa9fdc75b919
@@ -679,7 +724,7 @@ build_plots && ( trajectory_2D_error = md((
 	dt = 0.1,
 	nsteps = 100,
 	isave = 1,
-	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
+	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
 )...) )
 
 # ╔═╡ bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
@@ -693,7 +738,7 @@ build_plots && @gif for x in trajectory_2D_error
 	histogram(
 		[ p.x.err for p in x ],
 		xlabel="Uncertainty in x",ylabel="Number of points",
-		bins=0:1e-4:20e-4,ylims=[0,30]
+		bins=0:1e-4:20e-4,ylims=[0,50]
 	)
 end
 
@@ -712,6 +757,11 @@ build_plots && @gif for step in eachindex(earth_traj_best)
 	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
+# ╔═╡ e5b557d7-0952-4409-ae4c-a0c8ce736e03
+build_plots && @gif for (step,x) in pairs(trajectory_periodic_large)
+  	scatter([ wrap.((p.x,p.y),316.2) for p in x ], lims=(-170,170))
+end
+
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
 ## Table of Contents
@@ -721,6 +771,7 @@ md"""
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CellListMap = "69e1c6dd-3888-40e6-b3c8-31ac5f578864"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
@@ -731,6 +782,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 BenchmarkTools = "~1.1.4"
+CellListMap = "~0.5.18"
 ForwardDiff = "~0.10.19"
 Measurements = "~2.6.0"
 Plots = "~1.21.3"
@@ -781,6 +833,12 @@ git-tree-sha1 = "f641eb0a4f00c343bbc32346e1217b86f3ce9dad"
 uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 version = "0.5.1"
 
+[[CellListMap]]
+deps = ["DocStringExtensions", "LinearAlgebra", "Parameters", "ProgressMeter", "Random", "Setfield", "StaticArrays"]
+git-tree-sha1 = "31b252509c6865b3771d5b553c62b57439dc2b0c"
+uuid = "69e1c6dd-3888-40e6-b3c8-31ac5f578864"
+version = "0.5.18"
+
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "4ce9393e871aca86cc457d9f66976c3da6902ea7"
@@ -820,6 +878,12 @@ version = "3.37.0"
 [[CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
+
+[[ConstructionBase]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "f74e9d5388b8620b4cee35d4c5a618dd4dc547f4"
+uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+version = "1.3.0"
 
 [[Contour]]
 deps = ["StaticArrays"]
@@ -936,6 +1000,10 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
+
+[[Future]]
+deps = ["Random"]
+uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
@@ -1228,6 +1296,12 @@ git-tree-sha1 = "b2a7af664e098055a7529ad1a900ded962bca488"
 uuid = "2f80f16e-611a-54ab-bc61-aa92de5b98fc"
 version = "8.44.0+0"
 
+[[Parameters]]
+deps = ["OrderedCollections", "UnPack"]
+git-tree-sha1 = "2276ac65f1e236e0a6ea70baff3f62ad4c625345"
+uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+version = "0.12.2"
+
 [[Parsers]]
 deps = ["Dates"]
 git-tree-sha1 = "438d35d2d95ae2c5e8780b330592b6de8494e779"
@@ -1278,6 +1352,12 @@ version = "1.2.2"
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[[ProgressMeter]]
+deps = ["Distributed", "Printf"]
+git-tree-sha1 = "afadeba63d90ff223a6a48d2009434ecee2ec9e8"
+uuid = "92933f4c-e287-5a05-a399-4b506db050ca"
+version = "1.7.1"
+
 [[Qt5Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "xkbcommon_jll"]
 git-tree-sha1 = "ad368663a5e20dbb8d6dc2fddeefe4dae0781ae8"
@@ -1325,6 +1405,12 @@ version = "1.1.0"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "Requires"]
+git-tree-sha1 = "fca29e68c5062722b5b4435594c3d1ba557072a3"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "0.7.1"
 
 [[SharedArrays]]
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
@@ -1419,6 +1505,11 @@ version = "1.3.0"
 [[UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+
+[[UnPack]]
+git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
+uuid = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+version = "1.0.2"
 
 [[Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
@@ -1652,7 +1743,6 @@ version = "0.9.1+5"
 # ╠═43e6b146-ee35-40f1-b540-3da22b9e1b1b
 # ╠═a2226893-4f32-4ec3-aaef-1c304467452c
 # ╟─dd9e4332-2908-40ef-b461-6b571df56cf4
-# ╠═5ad2af1d-5c41-40d8-a451-fd99d9faafc2
 # ╟─b5206dd5-1f46-4437-929b-efd68393b12b
 # ╠═eb5dc224-1491-11ec-1cae-d51c93cd292c
 # ╟─66c7d960-7e05-4613-84e8-2a40fe40dc3d
@@ -1713,6 +1803,7 @@ version = "0.9.1+5"
 # ╟─055e32d7-073c-40db-a267-750636b9f786
 # ╠═aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
 # ╠═1067527e-76b7-4331-b3ab-efd72fb99dfc
+# ╠═1b8178f5-5fb6-4e6b-aec5-b519095950bd
 # ╟─c4344e64-aa22-4328-a97a-71e44bcd289f
 # ╟─827bda6f-87d4-4d36-8d89-f144f4595240
 # ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
@@ -1727,8 +1818,14 @@ version = "0.9.1+5"
 # ╟─e61981d5-5448-45e9-81dc-320ac87ba813
 # ╠═31e1bb51-c531-4c4a-8634-5caafb7e9e51
 # ╠═b0b81da4-6788-45c4-b618-188a02b5e09c
-# ╠═8e618602-0c65-448f-adae-2c80e7cdd73e
-# ╠═4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
+# ╟─4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
+# ╟─826693ff-9a9b-46b1-aeb3-767a5e6f9441
+# ╠═7600c6dc-769e-4c77-8526-281a1bcec079
+# ╟─7cbc7036-562e-42c1-a15f-31eae3b50b87
+# ╠═29dbc47b-3697-4fdf-8f34-890ab4d0cdae
+# ╠═e5b557d7-0952-4409-ae4c-a0c8ce736e03
+# ╠═d2f4d622-8e35-4be3-b421-39b28a748cab
+# ╠═929dc88f-15e2-4910-8ed5-8b960e3138fa
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
