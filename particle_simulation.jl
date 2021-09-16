@@ -337,8 +337,7 @@ function force_pair(x::T,y::T,cutoff,side) where T
 	if d > cutoff
 		return zero(T)
 	else
-		Δv = Δv / d
-		return Δv*(d - cutoff)^2
+		return (Δv/d)*(d - cutoff)^2
 	end
 end
 
