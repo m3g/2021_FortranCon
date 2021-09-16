@@ -10,14 +10,11 @@ using StaticArrays
 # ╔═╡ d42f842d-6c2a-40db-b0c4-e936244a9e7c
 using BenchmarkTools
 
-# ╔═╡ d9bff7a0-7ce6-447b-ba76-120c691f6c0a
+# ╔═╡ 99b5c818-a825-4939-849e-1cade802f63d
 using Measurements
 
 # ╔═╡ d6564250-f646-40de-9463-a956af1a5b1d
 using ForwardDiff
-
-# ╔═╡ 84e305e9-6ab9-4005-a295-a12c4eff68c5
-using Optim
 
 # ╔═╡ 7c792b6b-b6ee-4e30-88d5-d0b8064f2734
 begin
@@ -47,7 +44,7 @@ A simple point in 2D space, with coordinates `x` and `y`.
 """
 
 # ╔═╡ 8c444ee4-8c77-413a-bbeb-9e5ae2428876
-struct Point{T}
+struct Point2D{T} <: FieldVector{2,T}
 	x::T
 	y::T
 end
@@ -58,26 +55,6 @@ We will define by hand the arithmetics needed for this kind of point. We could a
 
 We will discuss these functions and why it may be interesting to define them manually later. 
 """
-
-# ╔═╡ 414790ef-a592-418d-b116-9864b76530bf
-begin
-	import LinearAlgebra: norm
-	import Base: -, +, *, /, zero
-	-(p1::Point,p2::Point) = Point(p1.x - p2.x, p1.y - p2.y)
-	+(p1::Point,p2::Point) = Point(p1.x + p2.x, p1.y + p2.y)
-	*(x,p1::Point) = Point(x*p1.x, x*p1.y)
-	*(p1::Point,x) = x*p1
-	/(p1::Point,x) = Point(p1.x/x,p1.y/x)
-	zero(::Type{Point{T}}) where T = Point(zero(T),zero(T))
-	norm(p::Point) = sqrt(p.x^2 + p.y^2)
-	function random_point(::Type{Point{T}},range) where T 
-		p = Point(
-			range[begin] + rand(T)*(range[end]-range[begin]),
-			range[begin] + rand(T)*(range[end]-range[begin])
-		)
-		return p
-	end
-end
 
 # ╔═╡ dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 md"""
@@ -92,17 +69,8 @@ $$f(x,y,c)=
 \end{cases}$$
 """
 
-# ╔═╡ 0f52365d-34f4-46ed-923e-3ea31c6db0ca
-function force_pair(x::T,y::T,cutoff) where T
-	Δv = y - x
-	d = norm(Δv)
-	if d > cutoff
-		return zero(T)
-	else
-		Δv = Δv / d
-		return Δv*(d - cutoff)^2
-	end
-end
+# ╔═╡ 7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
+import LinearAlgebra: norm
 
 # ╔═╡ b5c09cd3-6063-4a36-96cd-2d128aa11b82
 const cutoff = 5.
@@ -114,20 +82,6 @@ The function that will compute the force over all pairs will just *naively* run 
 Inside `forces!`, the `force_pair` function will receive four parameters: the indexes of the particles and their positions. We will use the indexes later. 
 """
 
-# ╔═╡ f58769a6-a656-42a3-8bc6-c204d4cfd897
-function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
-	fill!(f,zero(T))
-	n = length(x)
-	for i in 1:n-1
-		for j in i+1:n
-			fpair = force_pair(i,j,x[i],x[j])
-			f[i] -= fpair
-			f[j] += fpair
-		end
-	end
-	return f
-end
-
 # ╔═╡ 144119ad-ab88-4165-883a-f2fc2464a838
 md"""
 Let us create some points to explain how the function will be called. 
@@ -138,15 +92,6 @@ md"""
 The function `force_pair`, will be passed to the function that computes the forces to all pairs as *closure*, which will capture the value of the cutoff. The closure also allows us to ignore the indexes of the particles, which are expected by the inner implementation of the function inside `forces`. For example:
 """
 
-# ╔═╡ 0d964841-7764-48a4-9a6d-0b017ce4a90e
-v = [ Point(1.,1.), Point(2.,2.) ]
-
-# ╔═╡ c56e1910-facc-4595-81e8-e2d5d8c4e8f4
-v[1] = Point(0.,0.)
-
-# ╔═╡ d54598a0-1190-402c-8b51-2d09ca47cdf0
-v
-
 # ╔═╡ b5206dd5-1f46-4437-929b-efd68393b12b
 md"""
 # Performing a particle simulation
@@ -156,7 +101,7 @@ Now, given the function that computes the forces, we can perform a particle simu
 1. Compute forces at time $t$ from positions $x$:
 $f(t) = f(x)$
 
-2. Update the positions (using $a = f/m$ for $m=1$):
+2. Update the positions (using $a = f/m$):
 $x(t + dt) = x(t) + v(t)dt + a(t)dt^2/2$
 
 3. Update the velocities:
@@ -167,33 +112,9 @@ $v(t+dt) = v(t) + a(t)*dt$
 ## The actual simulation code is as short:
 """
 
-# ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
-function md(x0,v0,mass,dt,nsteps,isave,force_pair::F) where F
-	x = copy(x0)
-	v = copy(v0)
-	f = similar(x0)
-	a = similar(x0)
-	trajectory = [ copy(x0) ] # will store the trajectory
-	for step in 1:nsteps
-		# Compute forces
-		forces!(f,x,force_pair)
-		# Accelerations
-		@. a = f / mass
-		# Update positions
-		@. x = x + v*dt + a*dt^2/2
-		# Update velocities
-		@. v = v + a*dt
-		# Save if required
-		if mod(step,isave) == 0
-			push!(trajectory,copy(x))
-		end
-	end
-	return trajectory
-end
-
 # ╔═╡ 66c7d960-7e05-4613-84e8-2a40fe40dc3d
 md"""
-## Lets run the simulation!
+## Let us run the simulation!
 """
 
 # ╔═╡ e717a8d9-ccfb-4f89-b2a2-f244f108b48d
@@ -212,12 +133,6 @@ We have a more interesting dynamics if we use periodic boundary conditions. To d
 We need all arithmetics of the points and some other point operations, like how to iterate over the point coordinates. Let us save our time using an implementation of that:
 """
 
-# ╔═╡ 27c0e8f3-dc17-46ae-a429-34cb453df888
-struct Point2D{T} <: FieldVector{2,T}
-	x::T
-	y::T
-end
-
 # ╔═╡ ed35d044-8506-4ec0-a2d3-03202d0c29a5
 md"""
 The `Point2D` structure above, by being a subtype of `FieldVector` from `StaticArrays`, has already all the arithmetics defined. 
@@ -227,15 +142,6 @@ The `Point2D` structure above, by being a subtype of `FieldVector` from `StaticA
 md"""
 We only need to define our custom random point generator:
 """
-
-# ╔═╡ 8914ae52-7f09-483a-8ca9-15530aadd371
-function random_point(::Type{Point2D{T}},range) where T 
-	p = Point2D(
-		range[begin] + rand(T)*(range[end]-range[begin]),
-		range[begin] + rand(T)*(range[end]-range[begin])
-	)
-	return p
-end
 
 # ╔═╡ 367a686c-4cab-4f13-b285-c3243168cfb1
 md"""
@@ -249,33 +155,10 @@ md"""
 The following function defines how to wrap the coordinates on the boundaries, for a square or cubic box of side `side`:
 """
 
-# ╔═╡ beeb3335-5c49-47de-a1d3-3eef5f9479f1
-function wrap(x,side)
-	x = rem(x,side)
-	if x >= side/2
-		x -= side
-	elseif x < -side/2
-		x += side
-	end
-	return x
-end		
-
 # ╔═╡ 02d9bf3b-708c-4293-b198-9043b334ff7e
 md"""
 This allows writting the force computation now as:
 """
-
-# ╔═╡ 0967b90d-ac88-476d-a57a-7c38dfa82204
-function force_pair(x::T,y::T,cutoff,side) where T
-	Δv = wrap.(y - x, side)
-	d = norm(Δv)
-	if d > cutoff
-		return zero(T)
-	else
-		Δv = Δv / d
-		return Δv*(d - cutoff)^2
-	end
-end
 
 # ╔═╡ 0a5282ee-c88a-4bcc-aca2-477f28e9e04d
 md"""
@@ -325,16 +208,6 @@ struct Point3D{T} <: FieldVector{3,T}
 	z::T
 end
 
-# ╔═╡ 1ce41841-1ca7-43e4-a08a-21142e29ed93
-function random_point(::Type{Point3D{T}},range) where T 
-	p = Point3D(
-		range[begin] + rand(T)*(range[end]-range[begin]),
-		range[begin] + rand(T)*(range[end]-range[begin]),
-		range[begin] + rand(T)*(range[end]-range[begin])
-	)
-	return p
-end
-
 # ╔═╡ 2aef27bd-dea6-4a93-9d0f-b9249c9dd2cd
 md"""
 That is enough such that we can run the simulations in 3D:
@@ -348,16 +221,159 @@ Performing simulations in different dimensions is not the most interesting, or m
 
 The concept is identical to what we have done initialy when we defined `Point` and its arithmetics. We would need to define a new type of structure carrying the positions and the errors, and define the appropriate error propagataion arithmetics for the operations that will be performed with that type of variable. 
 
-Fortunately, again, this is done, in the `Measurements` package:
 """
+
+# ╔═╡ e4657169-1bb2-4d4a-ac9d-adc80499d07d
+struct MyMeasurement{T}
+	x::T
+	Δx::T
+end
+
+# ╔═╡ e9376a4b-3d60-42eb-8681-cd2bcec13fe8
+Base.show(io::IO,m::MyMeasurement) = println(io," $(m.x) ± $(m.Δx)")
+
+# ╔═╡ c5cdd71f-5ded-482f-9205-c13f01a14d0b
+m = MyMeasurement(1.0,0.1)
+
+# ╔═╡ 4e7f8db4-b5cc-4a3e-9fa7-e62d8f2a36ac
+begin
+	import Base: -, +, *, /, ^, sqrt
+	+(m1::MyMeasurement,m2::MyMeasurement) = MyMeasurement(m1.x+m2.x,m1.Δx+m2.Δx)
+	-(m1::MyMeasurement,m2::MyMeasurement) = MyMeasurement(m1.x-m2.x,m1.Δx+m2.Δx)
+	*(α,m::MyMeasurement) = MyMeasurement(α*m.x,sign(α)*α*m.Δx)
+	*(m::MyMeasurement,α) = α*m
+	/(m::MyMeasurement,α) = inv(α)*m
+	sqrt(m::MyMeasurement{T}) where T = MyMeasurement(sqrt(m.x),inv(2*sqrt(m.x))*m.Δx)
+	^(m::MyMeasurement{T},n) where T = MyMeasurement{T}(m.x^n,n*m.x^(n-1)*m.Δx)
+end
+
+# ╔═╡ 8914ae52-7f09-483a-8ca9-15530aadd371
+function random_point(::Type{Point2D{T}},range) where T 
+	p = Point2D(
+		range[begin] + rand(T)*(range[end]-range[begin]),
+		range[begin] + rand(T)*(range[end]-range[begin])
+	)
+	return p
+end
+
+# ╔═╡ 0f52365d-34f4-46ed-923e-3ea31c6db0ca
+function force_pair(x::T,y::T,cutoff) where T
+	Δv = y - x
+	d = norm(Δv)
+	if d > cutoff
+		return zero(T)
+	else
+		Δv = Δv / d
+		return Δv*(d - cutoff)^2
+	end
+end
+
+# ╔═╡ f58769a6-a656-42a3-8bc6-c204d4cfd897
+function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
+	fill!(f,zero(T))
+	n = length(x)
+	for i in 1:n-1
+		for j in i+1:n
+			fpair = force_pair(i,j,x[i],x[j])
+			f[i] -= fpair
+			f[j] += fpair
+		end
+	end
+	return f
+end
+
+# ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
+function md(
+	x0::Vector{T},
+	v0::Vector{T},
+	mass,dt,nsteps,isave,force_pair::F
+) where {T,F}
+	x = copy(x0)
+	v = copy(v0)
+	a = similar(x0)
+	f = similar(x0)
+	trajectory = [ copy(x0) ] # will store the trajectory
+	for step in 1:nsteps
+		# Compute forces
+		forces!(f,x,force_pair)
+		# Accelerations
+		@. a = f / mass
+		# Update positions
+		@. x = x + v*dt + a*dt^2/2
+		# Update velocities
+		@. v = v + a*dt
+		# Save if required
+		if mod(step,isave) == 0
+			println("Saved trajectory at step: ",step)
+			push!(trajectory,copy(x))
+		end
+	end
+	return trajectory
+end
+
+# ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
+x0 = [ Point2D(100*rand(),100*rand()) for _ in 1:100] 
+
+# ╔═╡ a2226893-4f32-4ec3-aaef-1c304467452c
+f = similar(x0)
+
+# ╔═╡ beeb3335-5c49-47de-a1d3-3eef5f9479f1
+function wrap(x,side)
+	x = rem(x,side)
+	if x >= side/2
+		x -= side
+	elseif x < -side/2
+		x += side
+	end
+	return x
+end		
+
+# ╔═╡ 0967b90d-ac88-476d-a57a-7c38dfa82204
+function force_pair(x::T,y::T,cutoff,side) where T
+	Δv = wrap.(y - x, side)
+	d = norm(Δv)
+	if d > cutoff
+		return zero(T)
+	else
+		Δv = Δv / d
+		return Δv*(d - cutoff)^2
+	end
+end
+
+# ╔═╡ 5ad2af1d-5c41-40d8-a451-fd99d9faafc2
+forces!(f, x0, (i,j,p1,p2) -> force_pair(p1,p2,cutoff))
+
+# ╔═╡ 1ce41841-1ca7-43e4-a08a-21142e29ed93
+function random_point(::Type{Point3D{T}},range) where T 
+	p = Point3D(
+		range[begin] + rand(T)*(range[end]-range[begin]),
+		range[begin] + rand(T)*(range[end]-range[begin]),
+		range[begin] + rand(T)*(range[end]-range[begin])
+	)
+	return p
+end
+
+# ╔═╡ 70eb2e0a-a5c8-4975-8f6c-589035bea29c
+sqrt((2*(m + 4*m)^2/3))
+
+# ╔═╡ d32743c0-fc80-406f-83c5-4528e439589a
+x = Point2D(MyMeasurement(1.0,0.1),MyMeasurement(2.0,0.2))
+
+# ╔═╡ 310f247e-3fe8-4621-ae0b-b5ee38d2ee89
+2*x .+ sqrt.(x)
 
 # ╔═╡ 8267220a-f06e-4761-b310-00f8ba44e4b1
 md"""
-using `Measurments`  we do not need to change anything in our previous code, but only redefine the content of our points, which will now carry in each coordinate the position and the error in the position, accumulated from an initial uncertainty:
+
+Fortunately, there are some package that provide the error propagation in more general scenarios, by defining the proper progagation rules. 
+
+Here, we use the `Measurements`  package:
 """
 
-# ╔═╡ a0e39d66-e328-4b61-86d4-99df6b832b7a
-p = Point2D( rand() ± 1e-5, rand() ± 1e-5 )
+# ╔═╡ 8e2903be-4975-4e14-84ed-6e712f47fe47
+md"""
+Using `Measurments`  we do not need to change anything in our previous code, but only redefine the content of our points, which will now carry in each coordinate the position and the error in the position, accumulated from an initial uncertainty:
+"""
 
 # ╔═╡ 418f31bb-81d5-459b-b402-4fd4e3f4ab27
 md"""
@@ -365,22 +381,13 @@ We need to redefine your initial random point generator only:
 """
 
 # ╔═╡ 05402cbd-78c6-4234-8680-c351c8c37778
-function random_point(::Type{Point2D{Measurement{T}}},range,uncertainty) where T	
+function random_point(::Type{Point2D{Measurement{T}}},range,Δ) where T	
 	p = Point2D(
-		range[begin] + rand(T)(range[end]-range[begin]) ± uncertainty*rand(),
-		range[begin] + rand(T)(range[end]-range[begin]) ± uncertainty*rand()
+		range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ,
+		range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ
 	)
 	return p
 end
-
-# ╔═╡ ecdaaca2-f5d3-496c-960f-df9578268023
-x0 = [ random_point(Point{Float64},-50:50) for _ in 1:100 ]
-
-# ╔═╡ a2226893-4f32-4ec3-aaef-1c304467452c
-f = similar(x0)
-
-# ╔═╡ 5ad2af1d-5c41-40d8-a451-fd99d9faafc2
-forces!(f, x0, (i,j,p1,p2) -> force_pair(p1,p2,cutoff))
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
 trajectory = md((
@@ -436,7 +443,7 @@ random_point(Point2D{Measurement{Float64}},(-50,50),1e-5)
 
 # ╔═╡ 1d6eedfd-d013-4557-9cf2-103f8fb7b72a
 md"""
-The trajectory, of course, looks the same:
+The trajectory, of course, looks the same (except that we ran less steps, because propagating the error is expensive):
 """
 
 # ╔═╡ c003a61d-a434-4d7b-9214-5b52aa044248
@@ -468,20 +475,20 @@ The uncertainty of the positions will be taken as the diameter of each planet. I
 
 # ╔═╡ c91862dd-498a-4712-8e3d-b77e088cd470
 planets_x0 = [
-	Point2D(measurement(  0.0,   1.39), measurement(0.,   1.39)), # "Sun"
-	Point2D(measurement( 57.9,  4.879e-3), measurement(0.,  4.879e-3)), # "Mercury"
-	Point2D(measurement(108.2, 12.104e-3), measurement(0., 12.104e-3)), # "Venus"
-	Point2D(measurement(149.6, 12.756e-3), measurement(0., 12.756e-3)), # "Earth"
-	Point2D(measurement(227.9,  6.792e-3), measurement(0.,  6.792e-3)), # "Mars"
+	Point2D(  0.0 ±  1.39    , 0. ±  1.39    ), # "Sun"
+    Point2D( 57.9 ±  4.879e-3, 0. ±  4.879e-3), # "Mercury"
+    Point2D(108.2 ± 12.104e-3, 0. ± 12.104e-3), # "Venus"
+    Point2D(149.6 ± 12.756e-3, 0. ± 12.756e-3), # "Earth"
+    Point2D(227.9 ±  6.792e-3, 0. ±  6.792e-3), # "Mars"
 ]
 
 # ╔═╡ a08d6e6d-ddc4-40aa-b7c4-93ea03191415
-planets_v0 = [ 
-	Point2D(measurement(0., 0.), measurement(  0.0,   0.)), # "Sun"
-	Point2D(measurement(0., 0.), measurement( 4.10,   0.)), # "Mercury"
-	Point2D(measurement(0., 0.), measurement( 3.02,   0.)), # "Venus"
-	Point2D(measurement(0., 0.), measurement( 2.57,   0.)), # "Earth"
-	Point2D(measurement(0., 0.), measurement( 2.08,   0.)), # "Mars"	
+planets_v0 = [
+    Point2D(0. ± 0.,   0.0 ± 0.), # "Sun"
+    Point2D(0. ± 0.,  4.10 ± 0.), # "Mercury"
+    Point2D(0. ± 0.,  3.02 ± 0.), # "Venus"
+    Point2D(0. ± 0.,  2.57 ± 0.), # "Earth"
+    Point2D(0. ± 0.,  2.08 ± 0.)  # "Mars"  
 ]
 
 # ╔═╡ a356e2cc-1cb1-457a-986c-998cf1efe008
@@ -490,7 +497,7 @@ And the masses are given in units of $10^{24}$ kg:
 """
 
 # ╔═╡ 57141f7c-9261-4dc5-98e4-b136a15f86fc
-const masses = [ 1.99e6, 0.330, 4.87, 5.97, 0.642 ]
+ const masses = [ 1.99e6, 0.330, 4.87, 5.97, 0.642 ]
 
 # ╔═╡ 055e32d7-073c-40db-a267-750636b9f786
 md"""
@@ -508,9 +515,19 @@ trajectory_planets = md((
 	force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
 )...)
 
+# ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
+@gif for (step,x) in pairs(trajectory_planets)
+	colors = [ :yellow, :grey, :brown, :blue, :red ]
+  	positions = [ (p.x.val,p.y.val) for p in x ]
+	xerr = [ p.x.err for p in x ]
+	yerr = [ p.y.err for p in x ] 
+	scatter(positions,lims=[-250,250], color=colors, xerror=xerr, yerror=yerr)
+	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+end
+
 # ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
 md"""
-One thing I don't like, though, is that in two years the earth appeared to have made much less than to complete revolutions around the sun. Something is wrong with our data. Can we improve that?
+One thing I don't like, though, is that in two years the earth did not complete two  revolutions around the sun. Something is wrong with our data. Can we improve that?
 """
 
 # ╔═╡ 827bda6f-87d4-4d36-8d89-f144f4595240
@@ -524,27 +541,33 @@ Here we speculate that what was wrong with our data was that the initial positio
 We will define, then, an objective function which returns the displacement of the earth relative to its initial position (at day one) after one year. Our goal is that after one year the earth returns to its initial position.
 """
 
-# ╔═╡ 0103b69a-2505-42f8-8df4-d08759eba077
-function error_in_orbit(x::T=149.6) where T
+# ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
+function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
 	x0 = [
 		Point2D( zero(T), zero(T)), # "Sun"
-		Point2D(      x,  zero(T))  # "Earth"
+		Point2D(       x, zero(T))  # "Earth"
 	]
 	v0 = [ 
-		Point2D( zero(T),     zero(T)), # "Sun"
-		Point2D( zero(T), 2.57*one(T))  # "Earth"
+		Point2D( zero(T), zero(T)), # "Sun"
+		Point2D( zero(T), 2.57*one(T)), # "Earth"
 	]
-	masses = [ 1.99e6*one(T), 5.97*one(T) ]
-	last_position = md((
+	masses = [ 1.99e6, 5.97 ]
+	trajectory = md((
 		x0 = x0, 
 		v0 = v0, 
 		mass = masses,
 		dt = 1, # days
-		nsteps = 365, # one earth year
-		isave = 365, # save only last point
+		nsteps = nsteps, # one earth year
+		isave = isave, # save only last point
 		force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
 	)...)
-	return norm(last_position[end][2] - x0[2])
+	return trajectory
+end
+
+# ╔═╡ 13e7da81-8581-4f32-9fdb-2599dd36a12c
+function error_in_orbit(x::T=149.6) where T
+	traj = earth_orbit(x,365,365) # Save one point only
+	return norm(traj[end][2]-[x,0.])
 end
 
 # ╔═╡ fda6171c-9675-4f2e-b226-7ccf100529cd
@@ -560,20 +583,20 @@ error_derivative(x) = ForwardDiff.derivative(error_in_orbit,x)
 function gradient_descent(x,f,g,tol,maxtrial)
 	itrial = 0
 	step = 1.0
-	xbest = x0
-	fbest = f(x)
-	grad = g(x)
+	xbest, fbest, grad = x0, f(x), g(x)
+	fx = fbest
 	while (abs(grad) > tol) && (itrial < maxtrial)
 		xtrial = x - grad*step
-		if f(xtrial) > f(x)
+		ftrial = f(xtrial)
+		if ftrial > fx
 			step = step / 2
 		else
-			x = xtrial
+			x, fx = xtrial, ftrial
 			grad = g(x)
 			step = 1.0
-			if f(x) < fbest
+			if fx < fbest
 				xbest = x
-				fbest = f(x)
+				fbest = fx
 			end
 		end
 		itrial += 1
@@ -592,34 +615,11 @@ md"""
 Seems that it worked! Let us see our trajectory now with the new initial condition:
 """
 
-# ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
-function earth_trajectory(x::T) where T
-	x0 = [
-		Point2D( 0., 0.), # "Sun"
-		Point2D(  x, 0.)  # "Earth"
-	]
-	v0 = [ 
-		Point2D( 0., 0.  ), # "Sun"
-		Point2D( 0., 2.57), # "Earth"
-	]
-	masses = [ 1.99e6, 5.97 ]
-	earth_trajectory = md((
-		x0 = x0, 
-		v0 = v0, 
-		mass = masses,
-		dt = 1, # days
-		nsteps = 365, # one earth year
-		isave = 1, # save only last point
-		force_pair = (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
-	)...)
-	return earth_trajectory
-end
-
 # ╔═╡ 31e1bb51-c531-4c4a-8634-5caafb7e9e51
-earth_traj_0 = earth_trajectory(149.6)
+earth_traj_0 = earth_orbit(149.6)
 
 # ╔═╡ b0b81da4-6788-45c4-b618-188a02b5e09c
-earth_traj_best = earth_trajectory(best_x0[1])
+earth_traj_best = earth_orbit(best_x0[1])
 
 # ╔═╡ 8e618602-0c65-448f-adae-2c80e7cdd73e
 earth_traj_0[end][2], earth_traj_best[end][2]
@@ -632,6 +632,16 @@ md"""
 # ╔═╡ 2a2e9155-1c77-46fd-8502-8431573f94d0
 md"""
 ## Default plot setup
+"""
+
+# ╔═╡ b557a646-8c3c-4dc7-8788-bf98aec8c5c0
+md"""
+Use Printf to print some data.
+"""
+
+# ╔═╡ 260d5753-6cc2-4137-8a2c-8d8a47585ecf
+md"""
+We can set this to false to avoid ploting everything. 
 """
 
 # ╔═╡ a9981931-4cc9-4d16-a6d2-34b4071a84d7
@@ -667,8 +677,8 @@ build_plots && ( trajectory_2D_error = md((
 	v0 = [random_point(Point2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
 	mass = [ 1.0 for _ in 1:100 ],
 	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
+	nsteps = 100,
+	isave = 1,
 	force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
 )...) )
 
@@ -683,18 +693,8 @@ build_plots && @gif for x in trajectory_2D_error
 	histogram(
 		[ p.x.err for p in x ],
 		xlabel="Uncertainty in x",ylabel="Number of points",
-		bins=0:1e-4:20e-4,ylims=[0,50]
+		bins=0:1e-4:20e-4,ylims=[0,30]
 	)
-end
-
-# ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
-build_plots && @gif for (step,x) in pairs(trajectory_planets)
-	colors = [ :yellow, :grey, :brown, :blue, :red ]
-  	positions = [ (p.x.val,p.y.val) for p in x ]
-	xerr = [ p.x.err for p in x ]
-	yerr = [ p.y.err for p in x ] 
-	scatter(positions,lims=[-250,250], color=colors, xerror=xerr, yerror=yerr)
-	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
 # ╔═╡ 4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
@@ -712,12 +712,6 @@ build_plots && @gif for step in eachindex(earth_traj_best)
 	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
-# ╔═╡ 043d89a4-ac5d-49ac-9820-b35c5ee967bc
-begin 
-	reset_element(x::Measurement{T}) where T = zero(T) ± x.err
-	reset_element(x) = zero(x)
-end
-
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
 ## Table of Contents
@@ -730,7 +724,6 @@ BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
-Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -740,7 +733,6 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 BenchmarkTools = "~1.1.4"
 ForwardDiff = "~0.10.19"
 Measurements = "~2.6.0"
-Optim = "~1.4.1"
 Plots = "~1.21.3"
 PlutoUI = "~0.7.9"
 StaticArrays = "~1.2.12"
@@ -758,12 +750,6 @@ version = "3.3.1"
 
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
-
-[[ArrayInterface]]
-deps = ["IfElse", "LinearAlgebra", "Requires", "SparseArrays", "Static"]
-git-tree-sha1 = "d84c956c4c0548b4caf0e4e96cf5b6494b5b1529"
-uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "3.1.32"
 
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -915,18 +901,6 @@ git-tree-sha1 = "d8a578692e3077ac998b50c0217dfd67f21d1e5f"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.0+0"
 
-[[FillArrays]]
-deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
-git-tree-sha1 = "caf289224e622f518c9dbfe832cdafa17d7c80a6"
-uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "0.12.4"
-
-[[FiniteDiff]]
-deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
-git-tree-sha1 = "8b3c09b56acaf3c0e581c66638b85c8650ee9dca"
-uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
-version = "2.8.1"
-
 [[FixedPointNumbers]]
 deps = ["Statistics"]
 git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
@@ -1021,11 +995,6 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "8a954fed8ac097d5be04921d595f741115c1b2ad"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+0"
-
-[[IfElse]]
-git-tree-sha1 = "28e837ff3e7a6c3cdb252ce49fb412c8eb3caeef"
-uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
-version = "0.1.0"
 
 [[IniFile]]
 deps = ["Test"]
@@ -1160,12 +1129,6 @@ git-tree-sha1 = "7f3efec06033682db852f8b3bc3c1d2b0a0ab066"
 uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
 version = "2.36.0+0"
 
-[[LineSearches]]
-deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
-git-tree-sha1 = "f27132e551e959b3667d8c93eae90973225032dd"
-uuid = "d3d80556-e9d4-5f37-9878-2ab0fcc64255"
-version = "7.1.1"
-
 [[LinearAlgebra]]
 deps = ["Libdl"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -1222,12 +1185,6 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 [[MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 
-[[NLSolversBase]]
-deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
-git-tree-sha1 = "144bab5b1443545bc4e791536c9f1eacb4eed06a"
-uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
-version = "7.8.1"
-
 [[NaNMath]]
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
@@ -1254,12 +1211,6 @@ git-tree-sha1 = "13652491f6856acfd2db29360e1bbcd4565d04f1"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.5+0"
 
-[[Optim]]
-deps = ["Compat", "FillArrays", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
-git-tree-sha1 = "7863df65dbb2a0fa8f85fcaf0a41167640d2ebed"
-uuid = "429524aa-4258-5aef-a3af-852621145aeb"
-version = "1.4.1"
-
 [[Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "51a08fb14ec28da2ec7a927c4337e4332c2a4720"
@@ -1276,12 +1227,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "b2a7af664e098055a7529ad1a900ded962bca488"
 uuid = "2f80f16e-611a-54ab-bc61-aa92de5b98fc"
 version = "8.44.0+0"
-
-[[Parameters]]
-deps = ["OrderedCollections", "UnPack"]
-git-tree-sha1 = "2276ac65f1e236e0a6ea70baff3f62ad4c625345"
-uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
-version = "0.12.2"
 
 [[Parsers]]
 deps = ["Dates"]
@@ -1322,12 +1267,6 @@ deps = ["Base64", "Dates", "InteractiveUtils", "JSON", "Logging", "Markdown", "R
 git-tree-sha1 = "44e225d5837e2a2345e69a1d1e01ac2443ff9fcb"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 version = "0.7.9"
-
-[[PositiveFactorizations]]
-deps = ["LinearAlgebra"]
-git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
-uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
-version = "0.2.4"
 
 [[Preferences]]
 deps = ["TOML"]
@@ -1416,12 +1355,6 @@ git-tree-sha1 = "a322a9493e49c5f3a10b50df3aedaf1cdb3244b7"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
 version = "1.6.1"
 
-[[Static]]
-deps = ["IfElse"]
-git-tree-sha1 = "a8f30abc7c64a39d389680b74e749cf33f872a70"
-uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
-version = "0.3.3"
-
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
 git-tree-sha1 = "3240808c6d463ac46f1c1cd7638375cd22abbccb"
@@ -1486,11 +1419,6 @@ version = "1.3.0"
 [[UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
-
-[[UnPack]]
-git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
-uuid = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
-version = "1.0.2"
 
 [[Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
@@ -1708,24 +1636,23 @@ version = "0.9.1+5"
 
 # ╔═╡ Cell order:
 # ╟─4b484cf6-4888-4f04-b3fd-94862822b0c0
+# ╠═a82f22e4-f35b-461a-b481-1dff43722e44
 # ╠═8c444ee4-8c77-413a-bbeb-9e5ae2428876
 # ╟─a0de01b5-779a-48c0-8d61-12b02a5f527e
-# ╠═414790ef-a592-418d-b116-9864b76530bf
+# ╠═8914ae52-7f09-483a-8ca9-15530aadd371
 # ╟─dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
+# ╠═7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
 # ╠═0f52365d-34f4-46ed-923e-3ea31c6db0ca
 # ╠═b5c09cd3-6063-4a36-96cd-2d128aa11b82
 # ╠═374f239b-6470-40ed-b068-a8ecaace4f09
 # ╟─7719b317-e85b-4583-b401-a8614d4b2373
 # ╠═f58769a6-a656-42a3-8bc6-c204d4cfd897
 # ╟─144119ad-ab88-4165-883a-f2fc2464a838
-# ╠═ecdaaca2-f5d3-496c-960f-df9578268023
+# ╠═356ac5a4-c94e-42cb-a085-0198b29c7e52
 # ╠═43e6b146-ee35-40f1-b540-3da22b9e1b1b
 # ╠═a2226893-4f32-4ec3-aaef-1c304467452c
 # ╟─dd9e4332-2908-40ef-b461-6b571df56cf4
 # ╠═5ad2af1d-5c41-40d8-a451-fd99d9faafc2
-# ╠═0d964841-7764-48a4-9a6d-0b017ce4a90e
-# ╠═c56e1910-facc-4595-81e8-e2d5d8c4e8f4
-# ╠═d54598a0-1190-402c-8b51-2d09ca47cdf0
 # ╟─b5206dd5-1f46-4437-929b-efd68393b12b
 # ╠═eb5dc224-1491-11ec-1cae-d51c93cd292c
 # ╟─66c7d960-7e05-4613-84e8-2a40fe40dc3d
@@ -1733,11 +1660,8 @@ version = "0.9.1+5"
 # ╠═3755a4f3-1842-4de2-965e-d294c06c54c7
 # ╠═505ef5ab-f131-4ab3-a723-795b5eb5dc0f
 # ╟─eab7b195-64d5-4587-8687-48a673ab091b
-# ╠═a82f22e4-f35b-461a-b481-1dff43722e44
-# ╠═27c0e8f3-dc17-46ae-a429-34cb453df888
 # ╟─ed35d044-8506-4ec0-a2d3-03202d0c29a5
 # ╟─101ac577-6f2f-41a7-852f-d1de22c597e3
-# ╠═8914ae52-7f09-483a-8ca9-15530aadd371
 # ╟─367a686c-4cab-4f13-b285-c3243168cfb1
 # ╟─34dc72dc-4864-47c0-b730-183f67e7aea3
 # ╠═beeb3335-5c49-47de-a1d3-3eef5f9479f1
@@ -1760,9 +1684,16 @@ version = "0.9.1+5"
 # ╠═0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
 # ╠═4a498c18-406f-4437-b378-aa9fdc75b919
 # ╟─b6dcb9a3-59e3-4eae-9399-fb072c704f1a
-# ╠═d9bff7a0-7ce6-447b-ba76-120c691f6c0a
+# ╠═e4657169-1bb2-4d4a-ac9d-adc80499d07d
+# ╠═e9376a4b-3d60-42eb-8681-cd2bcec13fe8
+# ╠═c5cdd71f-5ded-482f-9205-c13f01a14d0b
+# ╠═4e7f8db4-b5cc-4a3e-9fa7-e62d8f2a36ac
+# ╠═70eb2e0a-a5c8-4975-8f6c-589035bea29c
+# ╠═d32743c0-fc80-406f-83c5-4528e439589a
+# ╠═310f247e-3fe8-4621-ae0b-b5ee38d2ee89
 # ╟─8267220a-f06e-4761-b310-00f8ba44e4b1
-# ╠═a0e39d66-e328-4b61-86d4-99df6b832b7a
+# ╠═99b5c818-a825-4939-849e-1cade802f63d
+# ╟─8e2903be-4975-4e14-84ed-6e712f47fe47
 # ╟─418f31bb-81d5-459b-b402-4fd4e3f4ab27
 # ╠═05402cbd-78c6-4234-8680-c351c8c37778
 # ╟─4e97f24c-c237-4117-bc57-e4e88c8fb8d2
@@ -1784,17 +1715,16 @@ version = "0.9.1+5"
 # ╠═1067527e-76b7-4331-b3ab-efd72fb99dfc
 # ╟─c4344e64-aa22-4328-a97a-71e44bcd289f
 # ╟─827bda6f-87d4-4d36-8d89-f144f4595240
-# ╠═0103b69a-2505-42f8-8df4-d08759eba077
+# ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
+# ╠═13e7da81-8581-4f32-9fdb-2599dd36a12c
 # ╠═fda6171c-9675-4f2e-b226-7ccf100529cd
 # ╠═d6564250-f646-40de-9463-a956af1a5b1d
 # ╠═107aec28-ecb5-4007-95e5-25d0a7f0c465
-# ╠═84e305e9-6ab9-4005-a295-a12c4eff68c5
 # ╠═b8320f78-323c-49a9-a9f9-2748d19ecb35
 # ╠═535716e6-9c1c-4324-a4cd-b1214df3c01d
 # ╠═931a9c5f-8f91-4e88-956b-50c0efc9c58b
 # ╠═7658a32c-d3da-4ec9-9d96-0d30bb18f08c
 # ╟─e61981d5-5448-45e9-81dc-320ac87ba813
-# ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
 # ╠═31e1bb51-c531-4c4a-8634-5caafb7e9e51
 # ╠═b0b81da4-6788-45c4-b618-188a02b5e09c
 # ╠═8e618602-0c65-448f-adae-2c80e7cdd73e
@@ -1802,9 +1732,10 @@ version = "0.9.1+5"
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
+# ╟─b557a646-8c3c-4dc7-8788-bf98aec8c5c0
 # ╠═febe8c06-b3aa-4db1-a3ea-fdc2a81bdebd
+# ╟─260d5753-6cc2-4137-8a2c-8d8a47585ecf
 # ╠═a9981931-4cc9-4d16-a6d2-34b4071a84d7
-# ╠═043d89a4-ac5d-49ac-9820-b35c5ee967bc
 # ╟─b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 # ╠═a756dd18-fac6-4527-944e-c16d8cc4bf95
 # ╟─00000000-0000-0000-0000-000000000001
