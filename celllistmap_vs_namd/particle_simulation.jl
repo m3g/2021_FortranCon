@@ -1,5 +1,6 @@
 using StaticArrays
 import LinearAlgebra: norm
+using CellListMap
 
 struct Point3D{T} <: FieldVector{3,T}
 	x::T
@@ -26,28 +27,13 @@ function wrap(x,side)
 	return x
 end
 
-function force_pair(x::T,y::T,cutoff,side) where T
-	Δv = wrap.(y - x, side)
-	d = norm(Δv)
-	if d > cutoff
-		return zero(T)
-	else
-		return (Δv/d)*(d - cutoff)^2
-	end
-end
-
-
-function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
-	fill!(f,zero(T))
-	n = length(x)
-	for i in 1:n-1
-		for j in i+1:n
-			fpair = force_pair(i,j,x[i],x[j])
-			f[i] -= fpair
-			f[j] += fpair
-		end
-	end
-	return f
+function force_pair!(x,y,i,j,d2,f,cutoff)
+    Δv = y - x
+    d = sqrt(d2)
+	fpair = (Δv/d)*(d - cutoff)^2
+    f[i] -= fpair
+    f[j] += fpair
+    return f
 end
 
 function gradient_descent(x,f,g,tol,maxtrial)
@@ -102,12 +88,45 @@ function md(
 	return trajectory
 end
 
-trajectory = md((
-	x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff))
-)...)
+function forces_fast!(
+	f::Vector{T},
+	x::Vector{T},
+	force_pair::F,
+	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
+) where {T,F}
+	cl = UpdateCellList!(x,box,cl,aux)
+	fill!(f,zero(T))
+	map_pairwise!(force_pair, f, box, cl)
+	return f
+end
+
+function run_md()
+
+    n = 10_000
+    side = 46
+    cutoff = 5.
+
+    x0 = [ random_point(Point3D{Float64},(-side/2,side/2)) for _ in 1:n ]
+    v0 = [ random_point(Point3D{Float64},(-1,1)) for _ in 1:n ]
+
+    box = Box([side,side,side],12)
+    cl = CellList(x0,box)
+    aux = CellListMap.AuxThreaded(cl)
+
+    trajectory = md((
+    	x0 = x0, 
+    	v0 = v0, 
+    	mass = [ 10.0 for _ in 1:n ],
+    	dt = 0.1,
+    	nsteps = 1000,
+    	isave = 10,
+    	forces! = (f,x) -> forces_fast!(
+            f,x, 
+            (p1,p2,i,j,d2,f) -> force_pair!(p1,p2,i,j,d2,f,cutoff),
+            box, cl, aux
+        )
+    )...)
+    
+    return trajectory
+end
+
