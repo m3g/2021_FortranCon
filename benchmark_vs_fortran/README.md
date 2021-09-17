@@ -2,7 +2,7 @@
 
 ## Important
 
-These codes are *not* optimized for ultimate performance. Optimizations can be performed on both sides. The present comparison is only to illustrate that propertly written Julia and Fortran codes should behave and perform similarly. 
+These codes are *not* optimized for ultimate performance. Optimizations can be performed on both sides. The present comparison is only to illustrate that propertly written Julia and Fortran codes should look and perform similarly. The syntax of both languages is very idiomatic for the representation of numerical calculations. 
 
 ## Run the benchmark
 
@@ -11,25 +11,24 @@ To execute the benchmark, just do:
 ./run.sh
 ```
 
-It is expected that `Julia` and `gfortran` are installed, and that the `StaticArrays` package
-was installed in `Julia`.  
+It is expected that `Julia` and `gfortran` are installed, and that the `StaticArrays` package was installed in `Julia`.  
 
 The expected output is something like:
 ```
 Fortran:
 
-real    0m43,351s
-user    0m43,306s
+real    0m49,351s
+user    0m49,306s
 sys     0m0,020s
 
 Julia:
 
-real    0m42,848s
-user    0m42,064s
+real    0m47,848s
+user    0m47,064s
 sys     0m0,693s
 ```
 
-and two trajectory files will be created: `traj_fortran.xyz` and `traj_julia.xyz`, which can be visualized in VMD, for example. The trajectory should look like this: https://youtu.be/GSyDRJUYWYY.
+and two trajectory files will be created: `traj_fortran.xyz` and `traj_julia.xyz`, which can be visualized in VMD, for example. The trajectory should look like this: https://youtu.be/GSyDRJUYWYY. These trajectories can be visualized with `vmd -e view_fortran.vmd`  and `vmd -e view_julia.vmd`.
 
 Small variations are expected, but the performances will be probably similar.
 
@@ -39,7 +38,7 @@ Here the syntax of the two codes being run are put side by side, for comparison.
 
 ### Function `wrap`:
 
-The wrap function computes the minimum-image distance associated to a coordinate. The codes are very similar in every aspect, except that the Fortran code is restricted to 64bits (double precision) floats.
+The wrap function computes the minimum-image distance associated to a coordinate. The codes are very similar in every aspect, except that the Fortran code is restricted to the type of floats defined in `dp`. The Fortran function was declared `elemental` to be used on arrays, element-wise. 
 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
@@ -61,13 +60,13 @@ end
 </td><td valign=top>
 
 ```fortran
-double precision function wrap(x,side)
+elemental real(dp) function wrap(x,side)
     implicit none
-    double precision :: x, side
+    real(dp), intent(in) :: x, side
     wrap = dmod(x,side)
     if (wrap >= side/2) then
         wrap = wrap - side
-    else if (wrap < -side/2) then
+    else if (wrap < -side/2gg) then
         wrap = wrap + side
     end if
 end function wrap
@@ -77,7 +76,7 @@ end function wrap
 
 ### Function `force_pair`:
 
-This function computes the forces given the coordinates of two particles as the input. The differences here are that in the Julia code the particles are of a generic type `T`, which can be of any dimension and/or variable type. The Fortran code is restricted here to double precision floats, and the dimension of the points is defined by the `ndim` input variable. Writting one explicit loop can be made shorter with the broadcasting (`.`) Julia syntax, which is used here and will be seen in other places. It is possible (I'm not completely sure) to do the same in Fortran if the `wrap` function was declared `elemental`.
+This function computes the forces given the coordinates of two particles as the input. The differences here are that in the Julia code the particles are of a generic type `T`, which can be of any dimension and/or variable type. The Fortran code is restricted here to floats of type `dp`, and the dimension of the points is defined by the `ndim` input variable. Writting one explicit loop can be made shorter with the broadcasting (`.`) Julia syntax, which is used here for `wrap`, and will be seen in other places. The Fortran `wrap` function, by being declared `elemental`, is automatically broadcasted.  
 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
@@ -87,38 +86,29 @@ This function computes the forces given the coordinates of two particles as the 
 ```julia
 function force_pair(x::T,y::T,cutoff,side) where T
     Δv = wrap.(y - x, side)
-    d = norm(Δv)
-    if d > cutoff
-        return zero(T)
-    else
-        Δv = Δv / d
-        return Δv*(d - cutoff)^2
-    end
+	d = norm(Δv)
+	if d > cutoff
+		return zero(T)
+	else
+		return (d - cutoff)*(Δv/d)
+	end
 end
 ```
 
 </td><td valign=top>
 
 ```fortran
-subroutine force_pair(ndim,fpair,x,y,cutoff,side)
+subroutine force_pair(ndim,fx,x,y,cutoff,side)
     implicit none
-    integer :: i, ndim
-    double precision :: fpair(ndim), wrap, d, norm
-    double precision :: x(ndim), y(ndim), cutoff, side, dv(ndim)
-    do i = 1, ndim
-        dv(i) = wrap(y(i) - x(i), side)
-    end do
+    integer :: ndim
+    real(dp) :: fx(ndim), d
+    real(dp) :: x(ndim), y(ndim), cutoff, side, dv(ndim)
+    dv = wrap(y-x,side)
     d = norm(ndim,dv)
     if (d > cutoff) then
-        do i = 1, ndim
-            fpair(i) = 0.d0
-        end do
+        fx = 0
     else
-        dv = dv / d
-        do i = 1, ndim
-           dv(i) = (dv(i)/d)*(d-cutoff)**2
-        end do
-        fpair = dv
+        fx = (d - cutoff)*(dv/d)
     end if
 end subroutine force_pair
 ```
@@ -127,7 +117,7 @@ end subroutine force_pair
 
 ### Function `forces`:
 
-The codes are very similar, with the exception that we have opted to use use `fill!` function in Julia to shorten the code. The use of `zero(T)` allows the code to be generic. An `@inbounds` flag was used in this inner loop which is critical for performance, and results in a small, but noticeable performance gain (about 5%).  
+The codes are very similar, with the exception that we have opted to use use `fill!` function in Julia which is the preferred syntax in this case because `f` is an array of arrays. The use of `zero(T)` allows the code to be generic. An `@inbounds` flag was used in this inner loop which is critical for performance, and results in a small, but noticeable performance gain (about 5%). The Fortran code is very compact as well, being lengthier only as a result of type declarations. 
 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
@@ -135,16 +125,14 @@ The codes are very similar, with the exception that we have opted to use use `fi
 <td valign=top>
 
 ```julia
-function forces!(
-    f::Vector{T},x::Vector{T},force_pair::F
-) where {T,F}
+function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
     fill!(f,zero(T))
     n = length(x)
     for i in 1:n-1
         @inbounds for j in i+1:n
             fpair = force_pair(i,j,x[i],x[j])
-            f[i] -= fpair
-            f[j] += fpair
+            f[i] += fpair
+            f[j] -= fpair
         end
     end
     return f
@@ -157,19 +145,15 @@ end
 subroutine forces(n,ndim,f,x,cutoff,side)
     implicit none
     integer :: n, ndim, i, j
-    double precision :: f(ndim,n), x(ndim,n)
-    double precision :: fpair(ndim)
-    double precision :: cutoff, side
-    do i = 1, n
-        do j = 1, ndim
-            f(j,i) = 0.d0
-        end do
-    end do
+    real(dp) :: f(ndim,n), x(ndim,n)
+    real(dp) :: fx(ndim)
+    real(dp) :: cutoff, side
+    f = 0
     do i = 1, n-1
         do j = i+1, n
-            call force_pair(ndim,fpair,x(:,i),x(:,j),cutoff,side)
-            f(:,i) = f(:,i) - fpair
-            f(:,j) = f(:,j) + fpair
+            call force_pair(ndim,fx,x(:,i),x(:,j),cutoff,side)
+            f(:,i) = f(:,i) + fx
+            f(:,j) = f(:,j) - fx
         end do
     end do
 end subroutine forces
@@ -222,12 +206,12 @@ end
 ```fortran
 subroutine md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
     implicit none
-    integer :: n, ndim, i, j, k, step, nsteps, isave, isaved
-    double precision :: dt
-    double precision :: x0(ndim,n), v0(ndim,n), mass(n)
-    double precision :: x(ndim,n), v(ndim,n), f(ndim,n), a(ndim,n)
-    double precision :: trajectory(ndim,n,nsteps/isave+1)
-    double precision :: cutoff, side
+    integer :: n, ndim, i, step, nsteps, isave, isaved
+    real(dp) :: dt
+    real(dp) :: x0(ndim,n), v0(ndim,n), mass(n)
+    real(dp) :: x(ndim,n), v(ndim,n), f(ndim,n), a(ndim,n)
+    real(dp) :: trajectory(ndim,n,nsteps/isave+1)
+    real(dp) :: cutoff, side
     ! Save initial positions
     trajectory(:,:,1) = x0
     x = x0
@@ -258,16 +242,21 @@ end subroutine md
 
 Here the codes differ a little bit, because the generation of initial coordinates and velocities can be performed with comprehensions `[...]` in Julia, and in Fortran we use explicit loops over preallocated arrays. The difference in the data structure becomes apparent, as we use vectors of `Point2D` objects in Julia, and plain matrices in Fortran. The memory layout of these two structures is the same, but abstracting the type of object as done in Julia allows the code to be more generic in general. The `md` function in Julia is called with the expansion of a named tuple for additional clarity.  
 
+In Julia the use of the module variables is declared outside the function, while in Fortran the module is used inside the main program. Finally, the Julia ends with a call to the `main()` function.
+
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
 <tr>
 <td valign=top>
 
 ```julia
-function main(nsteps)
+using .ParticleSimulation
+
+function main()
     n = 100
     cutoff = 5.
     side = 100.
+    nsteps = 200_000
     trajectory = md((
         x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:n ], 
         v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n ], 
@@ -287,27 +276,29 @@ function main(nsteps)
     end
     close(file)
 end
+
+main()
 ```
 
 </td><td valign=top>
 
 ```fortran
 program main
+    use ParticleSimulation
     implicit none
     integer, parameter :: n = 100, ndim = 2
     integer :: i, j, k, nsteps, isave
-    double precision :: x0(ndim,n), v0(ndim,n), mass(n)
-    double precision :: dt
-    double precision :: cutoff, side, wrap
-    double precision, allocatable :: trajectory(:,:,:)
-    double precision :: dble_rand
+    real(dp) :: x0(ndim,n), v0(ndim,n), mass(n)
+    real(dp) :: dt
+    real(dp) :: cutoff, side
+    real(dp), allocatable :: trajectory(:,:,:)
     ! Initialize positions and velocities
     do i = 1, n
         do j = 1, ndim
-            x0(j,i) = -50 + 100*dble_rand()
-            v0(j,i) = -1 + 2*dble_rand()
+            x0(j,i) = -50 + 100*dp_rand()
+            v0(j,i) = -1 + 2*dp_rand()
         end do
-        mass(i) = 10.d0
+        mass(i) = 10
     end do
     ! Parameters
     dt = 0.001
@@ -338,7 +329,7 @@ end program main
 
 In the Julia implementation we need to define the `Point2D` data structure, which is set as a subtype of the convenient `FieldVector` structure of the `StaticArrays` package, which allow all arithmetics to work out of the box for this type of point. We use also the `Printf` package to write the coordinates, and import the `norm`  function from `LinearAlgebra` (which is available by default in Julia), although writting a custom `norm` function would be trivial and equilvalent. We also defined a custom function to generate random points, and the code ends with the explicit call to the main function with the desired number of steps. 
 
-On the Fortran side a simple function to return a random number was defined and a function to compute the norm of a vector of the desired dimension was required.
+On the Fortran side we define the type of floats of the package explicitly. A simple function to return a random number was defined and a function to compute the norm of a vector of the desired dimension was required.
 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
@@ -362,21 +353,21 @@ function random_point(::Type{Point2D{T}},range) where T
     )
     return p
 end
-
-main(200_000)
 ```
 
 </td><td valign=top>
 
 ```fortran
-double precision function dble_rand()
-    call random_number(dble_rand)
-end function dble_rand
+integer, parameter :: dp = kind(0.0d0)
+
+double precision function dp_rand()
+    call random_number(dp_rand)
+end function dp_rand
 
 double precision function norm(ndim,x)
     integer :: ndim
     double precision :: x(ndim)
-    norm = 0.d0
+    norm = 0
     do i = 1, ndim
         norm = norm + x(i)**2
     end do

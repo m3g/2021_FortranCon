@@ -1,6 +1,11 @@
+module ParticleSimulation
+
 using StaticArrays
 using Printf
 using LinearAlgebra: norm
+
+export Point2D, random_point
+export md, force_pair, wrap
 
 function wrap(x,side)
     x = mod(x,side)
@@ -14,13 +19,12 @@ end
 
 function force_pair(x::T,y::T,cutoff,side) where T
     Δv = wrap.(y - x, side)
-    d = norm(Δv)
-    if d > cutoff
-        return zero(T)
-    else
-        Δv = Δv / d
-        return Δv*(d - cutoff)^2
-    end
+	d = norm(Δv)
+	if d > cutoff
+		return zero(T)
+	else
+		return (d - cutoff)*(Δv/d)
+	end
 end
 
 function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
@@ -29,8 +33,8 @@ function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
     for i in 1:n-1
         @inbounds for j in i+1:n
             fpair = force_pair(i,j,x[i],x[j])
-            f[i] -= fpair
-            f[j] += fpair
+            f[i] += fpair
+            f[j] -= fpair
         end
     end
     return f
@@ -72,12 +76,15 @@ function random_point(::Type{Point2D{T}},range) where T
     return p
 end
 
-function main(nsteps)
+end # module
 
+using .ParticleSimulation
+
+function main()
     n = 100
     cutoff = 5.
     side = 100.
-
+    nsteps = 200_000
     trajectory = md((
         x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:n ], 
         v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n ], 
@@ -87,7 +94,6 @@ function main(nsteps)
         isave = 1000,
         force_pair = (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side)
     )...)
-
     file = open("traj_julia.xyz","w")
     for (step,x) in pairs(trajectory)
         println(file,n)
@@ -97,8 +103,7 @@ function main(nsteps)
         end
     end
     close(file)
-
 end
 
-main(200_000)
+main()
 

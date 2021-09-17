@@ -1,6 +1,12 @@
-double precision function wrap(x,side)
+module ParticleSimulation
+
+    integer, parameter :: dp = kind(0.0d0)
+
+contains 
+
+elemental real(dp) function wrap(x,side)
     implicit none
-    double precision :: x, side
+    real(dp), intent(in) :: x, side
     wrap = dmod(x,side)
     if (wrap >= side/2) then
         wrap = wrap - side
@@ -9,70 +15,58 @@ double precision function wrap(x,side)
     end if
 end function wrap
 
-double precision function norm(ndim,x)
+real(dp) function norm(ndim,x)
     integer :: ndim
-    double precision :: x(ndim)
-    norm = 0.d0
+    real(dp) :: x(ndim)
+    norm = 0
     do i = 1, ndim
         norm = norm + x(i)**2
     end do
     norm  = dsqrt(norm)
 end function norm
 
-subroutine force_pair(ndim,fpair,x,y,cutoff,side)
+subroutine force_pair(ndim,fx,x,y,cutoff,side)
     implicit none
-    integer :: i, ndim
-    double precision :: fpair(ndim), wrap, d, norm
-    double precision :: x(ndim), y(ndim), cutoff, side, dv(ndim)
-    do i = 1, ndim
-        dv(i) = wrap(y(i) - x(i), side)
-    end do
+    integer :: ndim
+    real(dp) :: fx(ndim), d
+    real(dp) :: x(ndim), y(ndim), cutoff, side, dv(ndim)
+    dv = wrap(y-x,side)
     d = norm(ndim,dv)
     if (d > cutoff) then
-        do i = 1, ndim
-            fpair(i) = 0.d0
-        end do
+        fx = 0
     else
-        dv = dv / d
-        do i = 1, ndim
-           dv(i) = (dv(i)/d)*(d-cutoff)**2
-        end do
-        fpair = dv
+        fx = (d - cutoff)*(dv/d)
     end if
 end subroutine force_pair
 
 subroutine forces(n,ndim,f,x,cutoff,side)
     implicit none
     integer :: n, ndim, i, j
-    double precision :: f(ndim,n), x(ndim,n)
-    double precision :: fpair(ndim)
-    double precision :: cutoff, side
-    do i = 1, n
-        do j = 1, ndim
-            f(j,i) = 0.d0
-        end do
-    end do
+    real(dp) :: f(ndim,n), x(ndim,n)
+    real(dp) :: fx(ndim)
+    real(dp) :: cutoff, side
+    f = 0
     do i = 1, n-1
         do j = i+1, n
-            call force_pair(ndim,fpair,x(:,i),x(:,j),cutoff,side)
-            f(:,i) = f(:,i) - fpair
-            f(:,j) = f(:,j) + fpair
+            call force_pair(ndim,fx,x(:,i),x(:,j),cutoff,side)
+            f(:,i) = f(:,i) + fx
+            f(:,j) = f(:,j) - fx
         end do
     end do
 end subroutine forces
 
-double precision function dble_rand()
-    call random_number(dble_rand)
-end function dble_rand
+real(dp) function dp_rand()
+    call random_number(dp_rand)
+end function dp_rand
 
 subroutine md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
     implicit none
-    integer :: n, ndim, i, j, k, step, nsteps, isave, isaved
-    double precision :: dt
-    double precision :: x0(ndim,n), v0(ndim,n), mass(n)
-    double precision :: x(ndim,n), v(ndim,n), f(ndim,n), a(ndim,n)
-    double precision :: trajectory(ndim,n,nsteps/isave+1)
-    double precision :: cutoff, side
+    integer :: n, ndim, i, step, nsteps, isave, isaved
+    real(dp) :: dt
+    real(dp) :: x0(ndim,n), v0(ndim,n), mass(n)
+    real(dp) :: x(ndim,n), v(ndim,n), f(ndim,n), a(ndim,n)
+    real(dp) :: trajectory(ndim,n,nsteps/isave+1)
+    real(dp) :: cutoff, side
     ! Save initial positions
     trajectory(:,:,1) = x0
     x = x0
@@ -95,22 +89,24 @@ subroutine md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
     end do
 end subroutine md
 
+end module ParticleSimulation
+
 program main
+    use ParticleSimulation
     implicit none
     integer, parameter :: n = 100, ndim = 2
     integer :: i, j, k, nsteps, isave
-    double precision :: x0(ndim,n), v0(ndim,n), mass(n)
-    double precision :: dt
-    double precision :: cutoff, side, wrap
-    double precision, allocatable :: trajectory(:,:,:)
-    double precision :: dble_rand
+    real(dp) :: x0(ndim,n), v0(ndim,n), mass(n)
+    real(dp) :: dt
+    real(dp) :: cutoff, side
+    real(dp), allocatable :: trajectory(:,:,:)
     ! Initialize positions and velocities
     do i = 1, n
         do j = 1, ndim
-            x0(j,i) = -50 + 100*dble_rand()
-            v0(j,i) = -1 + 2*dble_rand()
+            x0(j,i) = -50 + 100*dp_rand()
+            v0(j,i) = -1 + 2*dp_rand()
         end do
-        mass(i) = 10.d0
+        mass(i) = 10
     end do
     ! Parameters
     dt = 0.001
