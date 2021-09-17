@@ -65,11 +65,23 @@ md"""
 
 The function will be a soft potential, which is zero for distances greater than a cutoff, and increasing quadratically for distances smaller than the cutoff:
 
-$$f(x,y,c)=
+$$u(\vec{x},\vec{y},c)=
 \begin{cases}
-0\textrm{~if~}||x-y|| > c \\
-(||x-y||-c)^2\textrm{~if~}||x-y||<c 
+(||\vec{y}-\vec{x}||-c)^2 &\textrm{if} & ||\vec{y}-\vec{x}||\leq c \\
+0 & \textrm{if} & ||\vec{y}-\vec{x}|| > c \\
 \end{cases}$$
+
+for which the forces are
+
+$$\vec{f_x}(\vec{x},\vec{y},c)=
+\begin{cases}
+\frac{(||\vec{y}-\vec{x}||-c)}{||\vec{y}-\vec{x}||}(\vec{y}-\vec{x}) &\textrm{if} & ||\vec{y}-\vec{x}||\leq c \\
+0 & \textrm{if} & ||\vec{y}-\vec{x}|| > c \\
+\end{cases}$$
+and
+$$\vec{f_y} = -\vec{f_x}$$.
+
+
 """
 
 # ╔═╡ 7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
@@ -202,7 +214,7 @@ const side = 100.
 
 # ╔═╡ fcff6973-012a-40fc-a618-f6262266287a
 md"""
-To run the simulation with the new periodic forces, we use the same `md` function, just passing the new `force_pair` function:
+To run the simulation with the new periodic forces, we use the same `md` function, just passing the new `fₓ` function:
 """
 
 # ╔═╡ c4798182-de75-4b59-8be7-f7cf1051364d
@@ -288,26 +300,39 @@ function random_point(::Type{Point2D{T}},range) where T
 	return p
 end
 
-# ╔═╡ 0f52365d-34f4-46ed-923e-3ea31c6db0ca
-function force_pair(x::T,y::T,cutoff) where T
+# ╔═╡ df33b999-4a42-4133-bf59-5a65240790cf
+function energy(x::T,y::T,cutoff) where T
 	Δv = y - x
 	d = norm(Δv)
 	if d > cutoff
-		return zero(T)
+		energy = zero(T)
 	else
-		return (Δv/d)*(d - cutoff)^2
+		energy = (d - cutoff)^2
 	end
+	return energy
+end
+
+# ╔═╡ 0f52365d-34f4-46ed-923e-3ea31c6db0ca
+function fₓ(x::T,y::T,cutoff) where T
+	Δv = y - x
+	d = norm(Δv)
+	if d > cutoff
+		fₓ = zero(T)
+	else
+		fₓ = (d - cutoff)*(Δv/d)
+	end
+	return fₓ
 end
 
 # ╔═╡ f58769a6-a656-42a3-8bc6-c204d4cfd897
-function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
+function forces!(f::Vector{T},x::Vector{T},fₓ::F) where {T,F}
 	fill!(f,zero(T))
 	n = length(x)
 	for i in 1:n-1
 		for j in i+1:n
-			fpair = force_pair(i,j,x[i],x[j])
-			f[i] -= fpair
-			f[j] += fpair
+			fᵢ = fₓ(i,j,x[i],x[j])
+			f[i] += fᵢ 
+			f[j] -= fᵢ
 		end
 	end
 	return f
@@ -331,14 +356,15 @@ function wrap(x,side)
 end
 
 # ╔═╡ 0967b90d-ac88-476d-a57a-7c38dfa82204
-function force_pair(x::T,y::T,cutoff,side) where T
+function fₓ(x::T,y::T,cutoff,side) where T
 	Δv = wrap.(y - x, side)
 	d = norm(Δv)
 	if d > cutoff
-		return zero(T)
+		fₓ = zero(T)
 	else
-		return (Δv/d)*(d - cutoff)^2
+		fₓ = (d - cutoff)*(Δv/d)
 	end
+	return fₓ
 end
 
 # ╔═╡ 1ce41841-1ca7-43e4-a08a-21142e29ed93
@@ -395,7 +421,7 @@ trajectory = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff))
+	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff))
 )...)
 
 # ╔═╡ 985b4ffb-7964-4b50-8c2f-e5f45f352500
@@ -406,7 +432,7 @@ trajectory_periodic = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
@@ -417,7 +443,7 @@ trajectory_periodic = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
+	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
@@ -428,7 +454,7 @@ trajectory_periodic_3D = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 4e97f24c-c237-4117-bc57-e4e88c8fb8d2
@@ -459,7 +485,7 @@ function gravitational_force(i,j,x,y,mass)
 	G = 0.00049823382528 # MKm³ / (10²⁴kg days²)
 	dr = y - x
 	r = norm(dr)
-	return -G*mass[i]*mass[j]*dr/r^3
+	return G*mass[i]*mass[j]*dr/r^3
 end
 
 # ╔═╡ 6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
@@ -647,7 +673,7 @@ trajectory_periodic_large = md((
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> force_pair(p1,p2,cutoff,316.2))
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,316.2))
 )...)
 
 # ╔═╡ 929dc88f-15e2-4910-8ed5-8b960e3138fa
@@ -690,10 +716,12 @@ We can set this to false to avoid ploting everything.
 const build_plots = true
 
 # ╔═╡ 374f239b-6470-40ed-b068-a8ecaace4f09
-build_plots && plot(
-	0:0.1:1.2*cutoff,force_pair.(0.,0:0.1:1.2*cutoff,cutoff),
-	xlabel="Distance",ylabel="Force"
-)
+build_plots && begin
+	r = 0:0.1:1.2*cutoff
+	plot(layout=(1,2),size=(600,300))
+	plot!(r,energy.(0.,r,cutoff),xlabel="Distance",ylabel="Energy",subplot=1)
+	plot!(r,fₓ.(0.,r,cutoff),xlabel="Distance",ylabel="Force",subplot=2)
+end	
 
 # ╔═╡ 43e6b146-ee35-40f1-b540-3da22b9e1b1b
 build_plots && scatter([(x.x, x.y) for x in x0])
@@ -723,7 +751,7 @@ build_plots && ( trajectory_2D_error = md((
 	dt = 0.1,
 	nsteps = 100,
 	isave = 1,
-	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> force_pair(p1,p2,cutoff,side))
+	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...) )
 
 # ╔═╡ bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
@@ -1732,6 +1760,7 @@ version = "0.9.1+5"
 # ╠═8914ae52-7f09-483a-8ca9-15530aadd371
 # ╟─dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 # ╠═7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
+# ╠═df33b999-4a42-4133-bf59-5a65240790cf
 # ╠═0f52365d-34f4-46ed-923e-3ea31c6db0ca
 # ╠═b5c09cd3-6063-4a36-96cd-2d128aa11b82
 # ╠═374f239b-6470-40ed-b068-a8ecaace4f09
