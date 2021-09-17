@@ -76,7 +76,7 @@ end function wrap
 
 ### Function `force_pair`:
 
-This function computes the forces given the coordinates of two particles as the input. The differences here are that in the Julia code the particles are of a generic type `T`, which can be of any dimension and/or variable type. The Fortran code is restricted here to floats of type `dp`, and the dimension of the points is defined by the `ndim` input variable. Writting one explicit loop can be made shorter with the broadcasting (`.`) Julia syntax, which is used here for `wrap`, and will be seen in other places. The Fortran `wrap` function, by being declared `elemental`, is automatically broadcasted.  
+This function computes the forces given the coordinates of two particles as the input. The differences here are that in the Julia code the particles are of a generic type `T`, which can be of any dimension and/or variable type. The Fortran code is restricted here to floats of type `dp`, and the dimension of the points is defined by the `ndim` input variable. Writing one explicit loop can be made shorter with the broadcasting (`.`) Julia syntax, which is used here for `wrap`, and will be seen in other places. The Fortran `wrap` function, by being declared `elemental`, is automatically broadcasted.  
 
 <table width=100%>
 <tr><td align=center><b>Julia</b></td><td align=center><b>Fortran</b></td></tr>
@@ -86,12 +86,12 @@ This function computes the forces given the coordinates of two particles as the 
 ```julia
 function force_pair(x::T,y::T,cutoff,side) where T
     Δv = wrap.(y - x, side)
-	d = norm(Δv)
-	if d > cutoff
-		return zero(T)
-	else
-		return (d - cutoff)*(Δv/d)
-	end
+    d = norm(Δv)
+    if d > cutoff
+        return zero(T)
+    else
+        return (d - cutoff)*(Δv/d)
+    end
 end
 ```
 
@@ -327,7 +327,7 @@ end program main
 
 ### Additional code
 
-In the Julia implementation we need to define the `Point2D` data structure, which is set as a subtype of the convenient `FieldVector` structure of the `StaticArrays` package, which allow all arithmetics to work out of the box for this type of point. We use also the `Printf` package to write the coordinates, and import the `norm`  function from `LinearAlgebra` (which is available by default in Julia), although writting a custom `norm` function would be trivial and equilvalent. We also defined a custom function to generate random points, and the code ends with the explicit call to the main function with the desired number of steps. 
+In the Julia implementation we need to define the `Point2D` data structure, which is set as a subtype of the convenient `FieldVector` structure of the `StaticArrays` package, which allow all arithmetics to work out of the box for this type of point. We use also the `Printf` package to write the coordinates, and import the `norm`  function from `LinearAlgebra` (which is available by default in Julia), although writing a custom `norm` function would be trivial and equivalent. We also defined a custom function to generate random points, and the code ends with the explicit call to the main function with the desired number of steps. 
 
 On the Fortran side we define the type of floats of the package explicitly. A simple function to return a random number was defined and a function to compute the norm of a vector of the desired dimension was required.
 

@@ -19,12 +19,12 @@ end
 
 function force_pair(x::T,y::T,cutoff,side) where T
     Δv = wrap.(y - x, side)
-	d = norm(Δv)
-	if d > cutoff
-		return zero(T)
-	else
-		return (d - cutoff)*(Δv/d)
-	end
+    d = norm(Δv)
+    if d > cutoff
+        return zero(T)
+    else
+        return (d - cutoff)*(Δv/d)
+    end
 end
 
 function forces!(f::Vector{T},x::Vector{T},force_pair::F) where {T,F}
