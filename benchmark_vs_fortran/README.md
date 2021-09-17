@@ -66,7 +66,7 @@ elemental real(dp) function wrap(x,side)
     wrap = dmod(x,side)
     if (wrap >= side/2) then
         wrap = wrap - side
-    else if (wrap < -side/2gg) then
+    else if (wrap < -side/2) then
         wrap = wrap + side
     end if
 end function wrap
@@ -106,7 +106,7 @@ subroutine force_pair(ndim,fx,x,y,cutoff,side)
     dv = wrap(y-x,side)
     d = norm(ndim,dv)
     if (d > cutoff) then
-        fx = 0
+        fx = 0.0_dp
     else
         fx = (d - cutoff)*(dv/d)
     end if
@@ -148,7 +148,7 @@ subroutine forces(n,ndim,f,x,cutoff,side)
     real(dp) :: f(ndim,n), x(ndim,n)
     real(dp) :: fx(ndim)
     real(dp) :: cutoff, side
-    f = 0
+    f = 0.0_dp
     do i = 1, n-1
         do j = i+1, n
             call force_pair(ndim,fx,x(:,i),x(:,j),cutoff,side)
@@ -301,11 +301,11 @@ program main
         mass(i) = 10
     end do
     ! Parameters
-    dt = 0.001
+    dt = 0.001_dp
     nsteps = 200000
     isave = 1000
-    cutoff = 5.
-    side = 100.
+    cutoff = 5.0_dp
+    side = 100.0_dp
     allocate(trajectory(ndim,n,nsteps/isave + 1))
     ! Run simulation
     call md(n,ndim,x0,v0,mass,dt,nsteps,isave,trajectory,cutoff,side)
@@ -316,7 +316,7 @@ program main
         write(10,*) n
         write(10,*) " step = ", k
         do j = 1, n
-            write(10,*) "He", wrap(trajectory(1,j,k),side), wrap(trajectory(2,j,k),side), 0.d0
+            write(10,*) "He", wrap(trajectory(1,j,k),side), wrap(trajectory(2,j,k),side), 0.0_dp
         end do
     end do
     close(10)
@@ -367,7 +367,7 @@ end function dp_rand
 double precision function norm(ndim,x)
     integer :: ndim
     double precision :: x(ndim)
-    norm = 0
+    norm = 0.0_dp
     do i = 1, ndim
         norm = norm + x(i)**2
     end do
