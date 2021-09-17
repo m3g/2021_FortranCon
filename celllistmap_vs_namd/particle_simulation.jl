@@ -1,6 +1,6 @@
 using StaticArrays
-import LinearAlgebra: norm
 using CellListMap
+import LinearAlgebra: norm
 
 struct Point3D{T} <: FieldVector{3,T}
 	x::T
@@ -117,7 +117,7 @@ function run_md()
     	x0 = x0, 
     	v0 = v0, 
     	mass = [ 10.0 for _ in 1:n ],
-    	dt = 0.1,
+    	dt = 0.01,
     	nsteps = 1000,
     	isave = 10,
     	forces! = (f,x) -> forces_fast!(
