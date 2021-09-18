@@ -12,7 +12,7 @@ These benchmarks were run on a Samsung i7 8th gen laptop, using 8 threads.
 
 ## Run the benchmark
 
-To execute the benchmark, just do:
+After installing NAMD, Julia, and the package dependencies (as explained below), execute the benchmark with:
 ```bash
 ./run.sh
 ```
