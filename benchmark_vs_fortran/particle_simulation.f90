@@ -22,7 +22,7 @@ real(dp) function norm(ndim,x)
     do i = 1, ndim
         norm = norm + x(i)**2
     end do
-    norm  = dsqrt(norm)
+    norm  = sqrt(norm)
 end function norm
 
 subroutine force_pair(ndim,fx,x,y,cutoff,side)

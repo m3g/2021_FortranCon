@@ -371,7 +371,7 @@ double precision function norm(ndim,x)
     do i = 1, ndim
         norm = norm + x(i)**2
     end do
-    norm  = dsqrt(norm)
+    norm  = sqrt(norm)
 end function norm
 ```
 
