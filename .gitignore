@@ -26,4 +26,12 @@ Manifest.toml
 *.swp
 *.xyz
 benchmark_vs_fortran/particle_simulation
-view.vmd
+*.mod
+
+# simulation files
+*.log
+*.xsc
+*.coor
+*.BAK
+*.vel
+*.dcd

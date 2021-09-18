@@ -614,25 +614,22 @@ error_derivative(x) = ForwardDiff.derivative(error_in_orbit,x)
 function gradient_descent(x,f,g,tol,maxtrial)
 	itrial = 0
 	step = 1.0
-	xbest, fbest, grad = x0, f(x), g(x)
-	fx = fbest
-	while (abs(grad) > tol) && (itrial < maxtrial)
-		xtrial = x - grad*step
+    fx = f(x)
+    gx = g(x)
+	while (abs(gx) > tol) && (itrial < maxtrial)
+		xtrial = x - gx*step
 		ftrial = f(xtrial)
 		if ftrial > fx
 			step = step / 2
 		else
-			x, fx = xtrial, ftrial
-			grad = g(x)
+            x = xtrial
+            fx = ftrial
+			gx = g(x)
 			step = 1.0
-			if fx < fbest
-				xbest = x
-				fbest = fx
-			end
 		end
 		itrial += 1
 	end 
-	return x, grad, itrial
+	return x, gx, itrial
 end
 
 # ╔═╡ 931a9c5f-8f91-4e88-956b-50c0efc9c58b

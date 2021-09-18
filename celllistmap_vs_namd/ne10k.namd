@@ -1,0 +1,59 @@
+
+
+#############################################################
+## ADJUSTABLE PARAMETERS                                   ##
+#############################################################
+
+set system "ne10k"
+set side 46.35999999999999
+
+structure          ./$system.psf
+coordinates        ./$system\_initial.pdb
+outputName         ./$system
+restartname        ./$system
+restartfreq        20000
+dcdfreq            100
+
+#############################################################
+## SIMULATION PARAMETERS                                   ##
+#############################################################
+
+# Input
+paraTypeCharmm      on
+parameters ./par_bms_dec03.inp
+ 
+# Force-Field Parameters
+exclude scaled1-4
+cutoff              12.0
+switching           off
+temperature         300.
+
+# Integrator Parameters
+timestep            1.0
+nonbondedFreq       1
+stepspercycle       1
+
+# Output
+binaryoutput        no
+outputEnergies      50
+
+# Periodic boundary conditions
+cellBasisVector1     $side       0.      0.
+cellBasisVector2      0.      $side      0.
+cellBasisVector3      0.       0.     $side
+wrapAll             off
+
+# Temperature scaling
+rescaleFreq 10
+rescaleTemp 300.
+
+## Particle-mesh Ewald Sum
+PME                 no
+PMEGridSpacing      1.0
+
+#############################################################
+## EXTRA PARAMETERS                                        ##
+#############################################################
+run 2000
+
+

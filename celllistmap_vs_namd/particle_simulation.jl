@@ -1,11 +1,18 @@
 using StaticArrays
 using CellListMap
-import LinearAlgebra: norm
+using FastPow
+using LinearAlgebra: norm
+using Statistics: mean
 
 struct Point3D{T} <: FieldVector{3,T}
 	x::T
 	y::T
 	z::T
+end
+
+struct Point2D{T} <: FieldVector{2,T}
+	x::T
+	y::T
 end
 
 function random_point(::Type{Point3D{T}},range) where T 
@@ -17,47 +24,109 @@ function random_point(::Type{Point3D{T}},range) where T
 	return p
 end
 
-function wrap(x,side)
-	x = rem(x,side)
-	if x >= side/2
-		x -= side
-	elseif x < -side/2
-		x += side
-	end
-	return x
+function random_point(::Type{Point2D{T}},range) where T 
+	p = Point2D(
+		range[begin] + rand(T)*(range[end]-range[begin]),
+		range[begin] + rand(T)*(range[end]-range[begin])
+	)
+	return p
 end
 
-function force_pair!(x,y,i,j,d2,f,cutoff)
-    Δv = y - x
-    d = sqrt(d2)
-	fpair = (Δv/d)*(d - cutoff)^2
-    f[i] -= fpair
-    f[j] += fpair
-    return f
+function energy(
+	x,ε,σ,
+	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
+)
+	cl = UpdateCellList!(x,box,cl,aux)
+	u = map_pairwise!(
+        (xᵢ,xⱼ,i,j,d2,u) -> begin
+			@fastpow u += ε*(σ^12/d2^6 - 2*σ^6/d2^3)
+		end,
+        zero(eltype(σ)), box, cl
+    )
+    return u
 end
 
-function gradient_descent(x,f,g,tol,maxtrial)
+function forces!(
+	f::Vector{T},
+	x::Vector{T},
+	ε,σ,
+	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
+) where {T,F}
+	cl = UpdateCellList!(x,box,cl,aux)
+	fill!(f,zero(T))
+	map_pairwise!(
+		(xᵢ,xⱼ,i,j,d2,f) -> begin
+			@fastpow ∂u∂xᵢ = 12*ε*(σ^12/d2^7 - σ^6/d2^4)*(xⱼ-xᵢ)
+			@inbounds f[i] -= ∂u∂xᵢ
+			@inbounds f[j] += ∂u∂xᵢ
+			return f
+		end,
+		f, box, cl
+	)
+	return f
+end
+
+function packu(
+	x,σ,
+	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
+)
+	cl = UpdateCellList!(x,box,cl,aux)
+	u = map_pairwise!(
+        (xᵢ,xⱼ,i,j,d2,u) -> begin 
+			d = sqrt(d2)
+			u += (d - σ)^2
+			return u
+		end,
+        zero(eltype(σ)), box, cl
+    )
+    return u
+end
+
+function packg!(
+	g::Vector{T},
+	x::Vector{T},
+	σ,
+	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
+) where T
+	cl = UpdateCellList!(x,box,cl,aux)
+	fill!(g,zero(T))
+	map_pairwise!(
+		(xᵢ,xⱼ,i,j,d2,g) -> begin
+			d = sqrt(d2)
+			Δv = xⱼ - xᵢ 
+			gₓ = -2*(d - σ)*(Δv/d)
+			g[i] += gₓ
+			g[j] -= gₓ
+			return g
+		end,
+		g, box, cl
+	)
+	return g
+end
+
+function gradient_descent!(x::Vector{T},f,g!;tol=1e-3,maxtrial=500) where T
+	gnorm(x) = maximum(norm(v) for v in x)
 	itrial = 0
 	step = 1.0
-	xbest, fbest, grad = x0, f(x), g(x)
-	fx = fbest
-	while (abs(grad) > tol) && (itrial < maxtrial)
-		xtrial = x - grad*step
-		ftrial = f(xtrial)
-		if ftrial > fx
+    xtrial = similar(x)
+	g = fill!(similar(x),zero(T))
+    fx = f(x)
+    g = g!(g,x)
+	while (gnorm(g) > tol) && (itrial < maxtrial) && (step > 1e-10)
+		@. xtrial = x - step*g
+		ftrial = f(xtrial)  
+		@show itrial, step, fx, ftrial
+		if ftrial >= fx
 			step = step / 2
 		else
-			x, fx = xtrial, ftrial
-			grad = g(x)
-			step = 1.0
-			if fx < fbest
-				xbest = x
-				fbest = fx
-			end
+            x .= xtrial
+            fx = ftrial
+			g = g!(g,x)
+			step = step * 2
 		end
 		itrial += 1
 	end 
-	return x, grad, itrial
+	return x, gnorm(g), itrial
 end
 
 function md(
@@ -88,43 +157,59 @@ function md(
 	return trajectory
 end
 
-function forces_fast!(
-	f::Vector{T},
-	x::Vector{T},
-	force_pair::F,
-	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
-) where {T,F}
-	cl = UpdateCellList!(x,box,cl,aux)
-	fill!(f,zero(T))
-	map_pairwise!(force_pair, f, box, cl)
-	return f
-end
-
 function run_md()
 
     n = 10_000
     side = 46
-    cutoff = 5.
+	ε = 0.0441795 # kcal/mol
+    σ = 2*1.64009 # Å 
+    mass_Ne = 20.17900 # g/mol 
+	T0 = 300.
+	kB = 0.001985875 # Boltzmann constant kcal / mol K
+	cutoff = 12.
 
     x0 = [ random_point(Point3D{Float64},(-side/2,side/2)) for _ in 1:n ]
-    v0 = [ random_point(Point3D{Float64},(-1,1)) for _ in 1:n ]
+    #x0 = [ random_point(Point2D{Float64},(-side/2,side/2)) for _ in 1:n ]
 
-    box = Box([side,side,side],12)
+    tol = 1.0
+    box = Box([side,side,side],tol)
+    #box = Box([side,side],tol)
     cl = CellList(x0,box)
     aux = CellListMap.AuxThreaded(cl)
+    x, gnorm, itrial = gradient_descent!(
+		copy(x0),
+		(x) -> packu(x,tol,box,cl,aux),
+		(g,x) -> packg!(g,x,tol,box,cl,aux)
+	)
+
+    box = Box([side,side,side],cutoff)
+    #box = Box([side,side],cutoff)
+    cl = CellList(x,box)
+    aux = CellListMap.AuxThreaded(cl)
+    x, gnorm, itrial = gradient_descent!(
+		copy(x),
+		(x) -> energy(x,ε,σ,box,cl,aux),
+		(g,x) -> -forces!(g,x,ε,σ,box,cl,aux)
+	)
+
+	x0 = CellListMap.wrap_to_first.(x0,Ref(box))
+	x = CellListMap.wrap_to_first.(x,Ref(box))
+
+	# Initial velocities
+	v0 = randn(Point3D{Float64},n)
+	v_mean = mean(v0)
+	@. v0 = v0 - Ref(v_mean)
+	kinetic = (mass_Ne/2)*mean(v -> norm(v)^2, v0)
+	@. v0 = v0 * sqrt(T0/(2*kinetic/(3*kB)))
 
     trajectory = md((
     	x0 = x0, 
     	v0 = v0, 
-    	mass = [ 10.0 for _ in 1:n ],
+    	mass = [ mass_Ne for _ in 1:n ],
     	dt = 0.01,
     	nsteps = 1000,
     	isave = 10,
-    	forces! = (f,x) -> forces_fast!(
-            f,x, 
-            (p1,p2,i,j,d2,f) -> force_pair!(p1,p2,i,j,d2,f,cutoff),
-            box, cl, aux
-        )
+    	forces! = (f,x) -> forces!(f,x,ε,σ,box,cl,aux)
     )...)
     
     return trajectory
