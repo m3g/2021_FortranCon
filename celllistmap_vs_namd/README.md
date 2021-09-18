@@ -1,10 +1,12 @@
-# Performance in a simulation of 10k Neon atoms
+# Comparision of CellListMap.jl with NAMD
 
 ## Important
 
 The Julia simulation code in `simulate.jl` is not highly optimized (there is no parallelization of the updating of coordinates and velocities, for example). The aim here is to illustrate how effective is `CellListMap.jl` in building the cell lists to avoid unnecessary pairwise interactions. No electrostatic interactions are present in the system. `NAMD` is a full features simulation package, which does many things besides just computing short-ranged Lennard-Jones interactions. The input parameters were set to reduce at minimum the extra work it might be performing (but it is hard to tell which is the overhead of having the *possibility* of performing much more complex calculations), and also to force the package to recompute the pair lists at every step, which is not the standard procedure in a MD simulation. 
 
 The only meaninful comparison here concerns the effectiveness of the `CellListMap.jl` cell list implementation for computing short-range interactions or other pairwise-dependent properties, which is good enough for the performance of this computation be comparable with that of a package as developed as NAMD.
+
+## Performance in a simulation of 10k Neon atoms
 
 These benchmarks were run on a Samsung i7 8th gen laptop, using 8 threads.
 
