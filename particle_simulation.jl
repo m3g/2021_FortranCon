@@ -75,7 +75,7 @@ for which the forces are
 
 $$\vec{f_x}(\vec{x},\vec{y},c)=
 \begin{cases}
-\frac{(||\vec{y}-\vec{x}||-c)}{||\vec{y}-\vec{x}||}(\vec{y}-\vec{x}) &\textrm{if} & ||\vec{y}-\vec{x}||\leq c \\
+2(||\vec{y}-\vec{x}||-c)\frac{(\vec{y}-\vec{x})}{||\vec{y}-\vec{x}||} &\textrm{if} & ||\vec{y}-\vec{x}||\leq c \\
 0 & \textrm{if} & ||\vec{y}-\vec{x}|| > c \\
 \end{cases}$$
 and
@@ -236,9 +236,7 @@ Something of the order of `200ms` and `200KiB` of allocations does not seem bad,
 
 # ╔═╡ 49b1f040-929a-4238-acd9-6554757b592c
 md"""
-# And now the fun begins
-
-Now we will show the generic code flexibility.
+# Exploring generics
 
 ## Running the simulations in 3D
 
@@ -319,7 +317,7 @@ function fₓ(x::T,y::T,cutoff) where T
 	if d > cutoff
 		fₓ = zero(T)
 	else
-		fₓ = (d - cutoff)*(Δv/d)
+		fₓ = 2*(d - cutoff)*(Δv/d)
 	end
 	return fₓ
 end
@@ -362,7 +360,7 @@ function fₓ(x::T,y::T,cutoff,side) where T
 	if d > cutoff
 		fₓ = zero(T)
 	else
-		fₓ = (d - cutoff)*(Δv/d)
+		fₓ = 2*(d - cutoff)*(Δv/d)
 	end
 	return fₓ
 end
@@ -541,19 +539,6 @@ trajectory_planets = md((
 	)
 )...)
 
-# ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
-@gif for (step,x) in pairs(trajectory_planets)
-	c = [ :yellow, :grey, :brown, :blue, :red ]
-  	positions = [ (p.x.val,p.y.val) for p in x ]
-	xerr = [ p.x.err for p in x ]
-	yerr = [ p.y.err for p in x ] 
-	scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
-	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
-end
-
-# ╔═╡ 1b8178f5-5fb6-4e6b-aec5-b519095950bd
-[ (p.x.err,p.y.err) for p in trajectory_planets[end] ]
-
 # ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
 md"""
 One thing I don't like, though, is that in two years the earth did not complete two  revolutions around the sun. Something is wrong with our data. Can we improve that?
@@ -625,7 +610,7 @@ function gradient_descent(x,f,g,tol,maxtrial)
             x = xtrial
             fx = ftrial
 			gx = g(x)
-			step = 1.0
+			step = step * 2
 		end
 		itrial += 1
 	end 
@@ -654,40 +639,78 @@ md"""
 # Accelerating with CellListMap.jl
 """
 
+# ╔═╡ fce1e3e0-cdf7-453f-b913-964c10fa85a6
+const n_large = 1000
+
+# ╔═╡ 542a9ef5-d9ee-49bd-9d31-61e28b80b5cb
+const box_side = 316.2
+
 # ╔═╡ 7600c6dc-769e-4c77-8526-281a1bcec079
-x0_large = [ Point2D(316.2*rand(),316.2*rand()) for _ in 1:1000 ] 
+x0_large = [ Point2D(box_side*rand(),box_side*rand()) for _ in 1:n_large ] 
 
 # ╔═╡ 7cbc7036-562e-42c1-a15f-31eae3b50b87
 md"""
-This is already too slow for running live. It takes ~30s in my computer
+This is already too slow for running live. It takes ~30s in my computer:
 """
 
 # ╔═╡ 29dbc47b-3697-4fdf-8f34-890ab4d0cdae
-trajectory_periodic_large = md((
+t_naive = @elapsed trajectory_periodic_large = md((
 	x0 = x0_large, 
-	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:1000 ], 
-	mass = [ 10.0 for _ in 1:1000 ],
+	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
+	mass = [ 10.0 for _ in 1:n_large ],
 	dt = 0.1,
 	nsteps = 1000,
 	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,316.2))
+	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,box_side))
 )...)
 
-# ╔═╡ 929dc88f-15e2-4910-8ed5-8b960e3138fa
-function forces_fast!(
-	f::Vector{T},
-	x::Vector{T},
-	force_pair::F,
-	box::Box,cl::CellList,
-) where {T,F}
-	cl = UpdateCellList!(x,box,cl)
+# ╔═╡ 0ee7fc18-f41f-4179-a75e-1e1d56b2db29
+md""" 
+Running time of naive algorithm: $t_naive seconds
+"""
+
+# ╔═╡ 4fc5ef4d-e072-41f7-aef9-b42730c8313c
+const box = Box([box_side,box_side],cutoff)
+
+# ╔═╡ 7dcadd85-2986-4e42-aa84-67128a8f666d
+const cl = CellList(x0_large,box)
+
+# ╔═╡ 91b5eac1-4799-4a72-ac6a-e2b117b787d5
+function fpair_cl(x,y,i,j,d2,f,box::Box)
+	Δv = y - x
+	d = sqrt(d2)
+	fₓ = (d - box.cutoff)*(Δv/d)
+	f[i] += fₓ
+	f[j] -= fₓ
+	return f
+end
+
+# ╔═╡ 0b8a2292-c0d6-44e4-b560-32d9d579a008
+function forces_cl!(f::Vector{T},x,box::Box,cl::CellList,fpair::F) where {T,F}
 	fill!(f,zero(T))
+	cl = UpdateCellList!(x,box,cl,parallel=false)
 	map_pairwise!(
-		(i,j,x,y,d2,f) -> force_pair(i,j,x,y,d2,f),
-		f, box, cl
+		(x,y,i,j,d2,f) -> fpair(x,y,i,j,d2,f,box),
+		f, box, cl, parallel=false
 	)
 	return f
 end
+
+# ╔═╡ 1b7b7d48-79d2-4317-9045-5b7e7bd073e5
+t_cell_lists = @elapsed trajectory_cell_lists = md((
+	x0 = x0_large, 
+	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
+	mass = [ 10.0 for _ in 1:n_large ],
+	dt = 0.1,
+	nsteps = 1000,
+	isave = 10,
+	forces! = (f,x) -> forces_cl!(f,x,box,cl,fpair_cl)
+)...)
+
+# ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
+md""" 
+Running time of CellListMap: $t_cell_lists seconds
+"""
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
 md"""
@@ -766,6 +789,16 @@ build_plots && @gif for x in trajectory_2D_error
 	)
 end
 
+# ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
+build_plots && @gif for (step,x) in pairs(trajectory_planets)
+	c = [ :yellow, :grey, :brown, :blue, :red ]
+  	positions = [ (p.x.val,p.y.val) for p in x ]
+	xerr = [ p.x.err for p in x ]
+	yerr = [ p.y.err for p in x ] 
+	scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
+	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+end
+
 # ╔═╡ 4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 build_plots && @gif for step in eachindex(earth_traj_best)
 	colors = [ :yellow, :blue ]
@@ -783,7 +816,18 @@ end
 
 # ╔═╡ e5b557d7-0952-4409-ae4c-a0c8ce736e03
 build_plots && @gif for (step,x) in pairs(trajectory_periodic_large)
-  	scatter([ wrap.((p.x,p.y),316.2) for p in x ], lims=(-170,170))
+  	scatter(
+		[ wrap.((p.x,p.y),box_side) for p in x ], 
+		lims=(-1.1*box_side/2,1.1*box_side/2)
+	)
+end
+
+# ╔═╡ 30d2f39e-5df2-4f38-8032-e5f8492ba335
+build_plots && @gif for (step,x) in pairs(trajectory_cell_lists)
+  	scatter(
+		[ wrap.((p.x,p.y),box_side) for p in x ], 
+		lims=(-1.1*box_side/2,1.1*box_side/2)
+	)
 end
 
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
@@ -1828,7 +1872,6 @@ version = "0.9.1+5"
 # ╟─055e32d7-073c-40db-a267-750636b9f786
 # ╠═aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
 # ╠═1067527e-76b7-4331-b3ab-efd72fb99dfc
-# ╠═1b8178f5-5fb6-4e6b-aec5-b519095950bd
 # ╟─c4344e64-aa22-4328-a97a-71e44bcd289f
 # ╟─827bda6f-87d4-4d36-8d89-f144f4595240
 # ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
@@ -1845,12 +1888,21 @@ version = "0.9.1+5"
 # ╠═b0b81da4-6788-45c4-b618-188a02b5e09c
 # ╟─4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 # ╟─826693ff-9a9b-46b1-aeb3-767a5e6f9441
+# ╠═fce1e3e0-cdf7-453f-b913-964c10fa85a6
+# ╠═542a9ef5-d9ee-49bd-9d31-61e28b80b5cb
 # ╠═7600c6dc-769e-4c77-8526-281a1bcec079
 # ╟─7cbc7036-562e-42c1-a15f-31eae3b50b87
 # ╠═29dbc47b-3697-4fdf-8f34-890ab4d0cdae
+# ╟─0ee7fc18-f41f-4179-a75e-1e1d56b2db29
 # ╠═e5b557d7-0952-4409-ae4c-a0c8ce736e03
 # ╠═d2f4d622-8e35-4be3-b421-39b28a748cab
-# ╠═929dc88f-15e2-4910-8ed5-8b960e3138fa
+# ╠═4fc5ef4d-e072-41f7-aef9-b42730c8313c
+# ╠═7dcadd85-2986-4e42-aa84-67128a8f666d
+# ╠═91b5eac1-4799-4a72-ac6a-e2b117b787d5
+# ╠═0b8a2292-c0d6-44e4-b560-32d9d579a008
+# ╠═1b7b7d48-79d2-4317-9045-5b7e7bd073e5
+# ╟─3f9dad58-294c-405c-bfc4-67855bb1e825
+# ╠═30d2f39e-5df2-4f38-8032-e5f8492ba335
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
