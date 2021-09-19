@@ -51,7 +51,7 @@ function forces!(
 	x::Vector{T},
 	ε,σ,
 	box::Box,cl::CellList,aux::CellListMap.AuxThreaded
-) where {T,F}
+) where T
 	cl = UpdateCellList!(x,box,cl,aux)
 	fill!(f,zero(T))
 	map_pairwise!(
