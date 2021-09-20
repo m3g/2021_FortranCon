@@ -1014,34 +1014,6 @@ An idea of the efficiency of the cell list implementation in `CellListMap.jl` ca
 We can run a simulation of this gas using the same functions we defined before, but with the actual potential energy:
 """
 
-# ╔═╡ ac52a71b-1138-4f1b-99c3-c174d9f09187
-md"""
-This simulation took $t_Ne$ seconds. 
-
-Again, to understand exactly what that means, we need to perform a proper comparison. In [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/celllistmap_vs_namd) two simulations of the same gas, with proper thermodynamic conditions, are performed. The Julia algorithm implemented is similar to the present one, except that thermalization is done by velocity rescaling and the velocity-verlet algorithm is used for propagating the positions. The same algorthms are used in the equivalent NAMD simulations. The benchmark result is, for a 4-cores/8-threads execution in my Laptop:
-
-````
-NAMD:
-
-real    1m14,049s
-user    8m59,065s
-sys     0m1,130s
-
-CellListMap:
-
-real    1m21,054s
-user    7m38,053s
-sys     0m2,172s
-````
-
-This comparison of course can be questined: `NAMD` is a general purpose MD package designed for massive-parallel simulations, wnd `CellListMap.jl` is a package for computing any distance-dependent property, and for now designed and optimized on shared-memory computers. 
-
-Nevertheless,the benchmark shows that it is possible to write high-performant code in Julia, and that `CellListMap.jl` is a powerful tool for simulating or computing distance-dependent properties from the results of simulations.
-
-One of the applications of this package is the computation of distribution functions, in the [ComplexMixtures.jl](https://m3g.github.io/ComplexMixtures.jl/stable/)  package.
-
-"""
-
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
 md"""
 # Some notebook options and setup
@@ -1245,6 +1217,34 @@ build_plots && @gif for x in trajectory_Ne
 		[ wrap.((p.x,p.y,p.z),box_side_Ne) for p in x ], 
 		lims=(-1.1*box_side_Ne/2,1.1*box_side_Ne/2))
 end
+
+# ╔═╡ ac52a71b-1138-4f1b-99c3-c174d9f09187
+md"""
+This simulation took $t_Ne seconds. 
+
+Again, to understand exactly what that means, we need to perform a proper comparison. In [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/celllistmap_vs_namd) two simulations of the same gas, with proper thermodynamic conditions, are performed. The Julia algorithm implemented is similar to the present one, except that thermalization is done by velocity rescaling and the velocity-verlet algorithm is used for propagating the positions. The same algorthms are used in the equivalent NAMD simulations. The benchmark result is, for a 4-cores/8-threads execution in my Laptop:
+
+````
+NAMD:
+
+real    1m14,049s
+user    8m59,065s
+sys     0m1,130s
+
+CellListMap:
+
+real    1m21,054s
+user    7m38,053s
+sys     0m2,172s
+````
+
+This comparison of course can be questined: `NAMD` is a general purpose MD package designed for massive-parallel simulations, wnd `CellListMap.jl` is a package for computing any distance-dependent property, and for now designed and optimized on shared-memory computers. 
+
+Nevertheless,the benchmark shows that it is possible to write high-performant code in Julia, and that `CellListMap.jl` is a powerful tool for simulating or computing distance-dependent properties from the results of simulations.
+
+One of the applications of this package is the computation of distribution functions, in the [ComplexMixtures.jl](https://m3g.github.io/ComplexMixtures.jl/stable/)  package.
+
+"""
 
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
