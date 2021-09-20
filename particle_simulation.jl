@@ -1003,11 +1003,21 @@ md"""
 The `FastPow` package unrols the high powers that need to be computed into multiplications, squares and cubes, which are faster to compute (with some loss of precision which is of no concern here). This could be done by hand, but for code clarity and convenience, we opt to use the `@fastpow` macro.
 """
 
+# ╔═╡ 7280e368-c68a-48a5-91fe-93c76607c144
+md"""
+The function that computes the energy associated to one pair of particles is, then:
+"""
+
 # ╔═╡ 755fae26-6db9-45a0-a60d-d0e9c063f8aa
 function ulj_pair(x,y,r2,u,ε,σ)
 	@fastpow u += ε*(σ^12/r2^6 - 2*σ^6/r2^3)
 	return u
 end	
+
+# ╔═╡ 9a8d8012-ba54-4d9b-8c4c-fe6358508f2a
+md"""
+And the function that computes the total energy is the mapping of that function to all relevant pairs through the `map_pairwise!` function:
+"""
 
 # ╔═╡ ffbeae5f-8aec-4473-a446-5b73bd911733
 function ulj(x,ε,σ,box::Box,cl::CellList)
@@ -1049,6 +1059,8 @@ end
 md"""
 ### A physical system: Neon gas
 
+To explore something more interesting than a two-dimensional set of points, we will approach an actual physical system. 
+
 We will compute the energy of a Ne gas with 10k particles, with density $\sim 0.1$ particles/Å³, which is roughly the atomic density of liquid water. 
 
 The Lennard-Jones parameters for Neon are:
@@ -1062,7 +1074,7 @@ const σ = 2*1.64009 # Å
 
 # ╔═╡ b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
 md"""
-Number of particles and box side:
+And we chose to simulate 10k particles, for which an atomic density typical of room-temperature liquids results in the following corresponding box side (thus, we are actually simulating a hihgly-compressed Neon gas, but this is more interesting because the number or pairwise interactions which have to be computed is greater for denser systems):
 """
 
 # ╔═╡ cd1102ac-1500-4d79-be83-72ac9180c7ce
@@ -1079,6 +1091,11 @@ Initial coordinates, box and cell lists. A typical cutoff for Lennard-Jones inte
 # ╔═╡ 10826a95-16f8-416d-b8c1-0ef3347c9b20
 x0_Ne = [random_point(Point3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
 
+# ╔═╡ c46a4f97-78e4-42fd-82b3-4dc6ce99abac
+md"""
+Given the initial coordinates, we can initialize the system box and cell lists:
+"""
+
 # ╔═╡ 7c433791-a653-4836-91e2-084355c01d90
 const box_Ne = Box([box_side_Ne for _ in 1:3],12.)
 
@@ -1088,6 +1105,11 @@ const cl_Ne = CellList(x0_Ne,box_Ne)
 # ╔═╡ c08fff28-520e-40af-951c-fe3c324f67e0
 md"""
 ### First, let us try to minimize the energy
+"""
+
+# ╔═╡ eb0f9080-2523-4633-be21-3a2281a1629e
+md"""
+The first thing in a MD simulation is trying to remove bad contacts by energy minimization:
 """
 
 # ╔═╡ e3cc3c77-71ad-4006-8e27-fabaa1ae9cfb
@@ -1103,6 +1125,11 @@ md"""
 # ╔═╡ 4e059cb8-6dac-450d-9f46-b3e657d9c3cf
 md"""
 To pack the atoms the "cutoff" needs to be of the order of the atom radii, instead of the cutoff of the Lennard-Jones interactions. Thus, we redefine the cell lists with a cutoff of σ. Since only very short-ranged interactions have to be computed, and the function is well behaved, the optimization is fast:
+"""
+
+# ╔═╡ 5ff9c89a-d999-4af2-8e7e-fb99d4948c36
+md"""
+Let us initialize again the system, considering the smaller cutoff:
 """
 
 # ╔═╡ 0f2f55f6-060b-475e-bef7-eaa99da4d99f
@@ -1127,6 +1154,11 @@ function u_pack(x,box::Box,cl::CellList)
     return u
 end
 
+# ╔═╡ 79169f89-fedc-466b-8170-fff99b98e147
+md"""
+Given the packing energy and gradient, we can solve the packing problem:
+"""
+
 # ╔═╡ b5e258cd-5542-4a4c-ae0f-91c2fee426db
 md"""
 Importantly, the result is a packing function which converged to a global minimizer (the resulting packing function value is zero):
@@ -1148,9 +1180,16 @@ Even if the energy is high, we have the guarantee that no atoms are too close to
 md"""
 ## How fast is CellListMap.jl?
 
-An idea of the efficiency of the cell list implementation in `CellListMap.jl` can be obtained by comparing the time required for an actual simulation of these Ne gas, compared to a stablished molecular dynamics simulation package, as NAMD. 
+An idea of the efficiency of the cell list implementation in `CellListMap.jl` can be obtained by comparing the time required for an actual simulation of these Ne gas, compared to a stablished molecular dynamics simulation package, as [NAMD](https://www.ks.uiuc.edu/Research/namd/). 
 
 We can run a simulation of this gas using the same functions we defined before, but with the actual potential energy:
+"""
+
+# ╔═╡ 10c86547-d4f4-4c3f-8906-ac18ce93f3b6
+md"""
+# Acknowledgements
+
+The author thanks [Mosè Giordano](https://giordano.github.io/) for valuable discussions on the working of `Measurements`, and many other members of the Julia and Fortran discourse forums for indirect contributions to this work. We also thank the FortranCon organizing comitee, in particular [Milan Curcic](https://milancurcic.com/) and [Ondřej Čertík](Ondřej Čertík) for the kind invitation and great contributions for the developement of a modern community and tools around Fortran.
 """
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
@@ -1318,7 +1357,7 @@ Here the example is only illustrative, but shows a common behavior: the energy a
 
 **Time required for energy minimization: $t_min seconds**
 
-Because of that `Packmol` was introduced. We first solve the problem of packing the atoms in the space guaranteeing a minimum distance between the atoms. Here, this consists on the minimization of our simplified potential:
+Because of that [`Packmol`](http://m3g.iqm.unicamp.br/packmol) was introduced. We first solve the problem of packing the atoms in the space guaranteeing a minimum distance between the atoms. Here, this consists on the minimization of our simplified potential:
 """
 
 # ╔═╡ 224336e2-522c-44af-b9a1-307e2ffff0f9
@@ -2508,7 +2547,9 @@ version = "0.9.1+5"
 # ╟─372637ff-9305-4d45-bf6e-e6531dadbd14
 # ╟─3b2c08a6-b27e-49be-a0b0-e5cb3d5546e0
 # ╠═f049ab19-7ecf-4c65-bf6d-21352c1fe767
+# ╟─7280e368-c68a-48a5-91fe-93c76607c144
 # ╠═755fae26-6db9-45a0-a60d-d0e9c063f8aa
+# ╟─9a8d8012-ba54-4d9b-8c4c-fe6358508f2a
 # ╠═ffbeae5f-8aec-4473-a446-5b73bd911733
 # ╟─3738e40f-9596-469d-aa58-a4b28d8a22f8
 # ╠═5f1054b8-2337-43c1-a086-26233e95d42b
@@ -2521,19 +2562,23 @@ version = "0.9.1+5"
 # ╠═f21604f4-e4f7-4d43-b3d9-32f429df443e
 # ╟─59b1dbce-64af-4868-8c9d-23792c4a3a9f
 # ╠═10826a95-16f8-416d-b8c1-0ef3347c9b20
+# ╟─c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 # ╠═7c433791-a653-4836-91e2-084355c01d90
 # ╠═410b9da4-7848-4385-bffc-a3d9bd03cf19
 # ╟─c08fff28-520e-40af-951c-fe3c324f67e0
+# ╟─eb0f9080-2523-4633-be21-3a2281a1629e
 # ╠═357c6621-b2b8-4f30-ba41-ffc1ae6f031b
 # ╟─e3cc3c77-71ad-4006-8e27-fabaa1ae9cfb
 # ╠═58eb5b4b-76ad-4f7a-b86b-0494a857dca1
 # ╟─574047fa-6626-4cd0-8317-32118129711e
 # ╟─739c9a8a-13a5-4a33-a441-f5bc6cb35e82
 # ╟─4e059cb8-6dac-450d-9f46-b3e657d9c3cf
+# ╟─5ff9c89a-d999-4af2-8e7e-fb99d4948c36
 # ╠═0f2f55f6-060b-475e-bef7-eaa99da4d99f
 # ╠═415ad590-247b-4a5d-b21e-7af4d0c17493
 # ╟─53c2e16e-b7f5-4df2-96f4-08402b5f8979
 # ╠═16cdbc18-e846-4d0a-b7e6-87f07c0c52d9
+# ╟─79169f89-fedc-466b-8170-fff99b98e147
 # ╠═224336e2-522c-44af-b9a1-307e2ffff0f9
 # ╟─06526edf-911a-4ecc-a350-6d932ca56cd5
 # ╟─b5e258cd-5542-4a4c-ae0f-91c2fee426db
@@ -2545,6 +2590,7 @@ version = "0.9.1+5"
 # ╠═339487cd-8ee8-4d1d-984b-b4c5ff00bae3
 # ╠═9cb29b01-7f49-4145-96d8-c8fd971fe1c8
 # ╟─ac52a71b-1138-4f1b-99c3-c174d9f09187
+# ╟─10c86547-d4f4-4c3f-8906-ac18ce93f3b6
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
