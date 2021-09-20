@@ -2,18 +2,17 @@
 <img height=80px src=https://github.com/m3g/2021_FortranCon/raw/main/docs/fotrancon_logo.png>
 </p>
 
-<p align=center>
-  <h2>Particle simulations with Julia</h2><br>
-  Leandro Martínez<br>
-  <i>Institute of Chemistry and Center for Computing in Engineering and Sciences</i><br>
-  <b>University of Campinas</b>
-</p>
+## Particle simulations with Julia
+Leandro Martínez<br>
+<i>Institute of Chemistry and Center for Computing in Engineering and Sciences</i><br>
+<b>University of Campinas</b>
 
 This repository contains the codes and documents associated with the talk "Particle simulations with Julia", presented at the Fortran 2021. 
 
 The main document here is the Pluto notebook file `particle_simulation.jl`, which can be viewed directly (non-interactively) at:
 
-[Particle simulations with Julia](https://m3g.github.io/2021_FortranCon/)
+
+### [Notebook: Particle simulations with Julia](https://m3g.github.io/2021_FortranCon/)
 
 Note: the page is about 30Mb-large and may take some time to completely load. Be pacient.
 
