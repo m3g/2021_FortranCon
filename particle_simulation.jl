@@ -1275,11 +1275,11 @@ end
 
 # ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
 build_plots && @gif for (step,x) in pairs(trajectory_planets)
-    c = [ :yellow, :grey, :brown, :blue, :red ]
+    colors = [ :yellow, :grey, :brown, :blue, :red ]
     positions = [ (p.x.val,p.y.val) for p in x ]
     xerr = [ p.x.err for p in x ]
     yerr = [ p.y.err for p in x ] 
-    scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
+    scatter(positions,lims=[-250,250], markercolor=colors, xerror=xerr, yerror=yerr)
     annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
@@ -1288,11 +1288,11 @@ build_plots && @gif for step in eachindex(earth_traj_best)
     colors = [ :yellow, :blue ]
     positions0 = [ (p.x,p.y) for p in earth_traj_0[step] ] 
     positions_best = [ (p.x,p.y) for p in earth_traj_best[step] ]
-    scatter(positions0,lims=[-250,250], color=colors, alpha=0.5)
-    scatter!(positions_best,lims=[-250,250], color=colors)
+    scatter(positions0,lims=[-250,250], markercolor=colors, alpha=0.5)
+    scatter!(positions_best,lims=[-250,250], markercolor=colors)
     scatter!(
         (earth_traj_best[1][2].x,earth_traj_best[1][2].y),
-        color=:white,alpha=0.5,
+        markercolor=:white,alpha=0.5,
         markersize=10
     )
     annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
