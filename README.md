@@ -2,9 +2,8 @@
 <img height=80px src=https://github.com/m3g/2021_FortranCon/raw/main/docs/fotrancon_logo.png>
 </p>
 
-## Particle simulations with Julia
-
 <p align=center>
+  <h2>Particle simulations with Julia<h2><br>
   Leandro Martínez<br>
   <i>Institute of Chemistry and Center for Computing in Engineering and Sciences</i><br>
   <b>University of Campinas</b>
