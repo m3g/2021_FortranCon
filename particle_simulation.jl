@@ -42,11 +42,41 @@ begin
     TableOfContents()
 end
 
+# ╔═╡ a87fad48-73c1-4a08-a6f1-aae759b3c6fc
+md"""
+# Particle Simulations with Julia
+
+Leandro Martínez
+
+Institute of Chemistry - University of Campinas
+
+[http://m3g.iqm.unicamp.br](http://m3g.iqm.unicamp.br) - 
+[https://github.com/m3g](https://github.com/m3g)
+
+"""
+
+# ╔═╡ 172227c2-b27a-40db-91f4-9566c2f6cf52
+md"""
+# Outline
+
+## Topics covered
+
+- Elements of a particle simulation
+- Benchmarking vs. a compiled language (Fortran)
+- Exploring the generic character of functions
+- Differentiable simulations and parameter fitting
+- Using cell lists
+- An efficient and generic cell list implementation
+- The Packmol strategy
+- Benchmarking vs. NAMD
+
+"""
+
 # ╔═╡ 4b484cf6-4888-4f04-b3fd-94862822b0c0
 md"""
-# Defining the type of particle *for the first time*
+# Defining the type of particle
 
-A simple point in 2D space, with coordinates `x` and `y`.
+We define a simple point in 2D space, with coordinates `x` and `y`. The point will be defined with the aid of the `StaticArrays` package, which provides convenient constructors for this type of variable, and all the arithmetics. The memory layout of a vector of these points is identical to that of a `N×M` matrix, where `N` is the dimensio nf the space (2D here) and `M` is the number of points. Julia is column-major, thus this is the most efficient memory layout for this type of computation.
 """
 
 # ╔═╡ 8c444ee4-8c77-413a-bbeb-9e5ae2428876
@@ -57,16 +87,14 @@ end
 
 # ╔═╡ a0de01b5-779a-48c0-8d61-12b02a5f527e
 md"""
-We will define by hand the arithmetics needed for this kind of point. We could avoid doing all this by using the `StaticArrays` package, but for didactical reasons today we will write our arithmetics manually. Here we define what it means to add, substract, multiply and divide the points for the operations we will need. We also define a funtion that returns a point with null coordinates (the `zero` function), and a function that returns a random point in a desired interval. 
-
-We will discuss these functions and why it may be interesting to define them manually later. 
+For convenience, here we will also define a function that returns a random point of tyis type, given a range of coordinates:
 """
 
 # ╔═╡ dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 md"""
 ## Force between a pair of particles 
 
-The function will be a soft potential, which is zero for distances greater than a cutoff, and increasing quadratically for distances smaller than the cutoff:
+Initially, the energy function will be a soft potential, which is zero for distances greater than a cutoff, and increasing quadratically for distances smaller than the cutoff:
 
 $$u(\vec{x},\vec{y},c)=
 \begin{cases}
@@ -87,15 +115,30 @@ $$\vec{f_y} = -\vec{f_x}$$.
 
 """
 
+# ╔═╡ ab3ff21b-bf82-4d8c-abd1-c27418956ed8
+md"""
+The standard Julia `LinearAlgebra` library provides a `norm` function, and there is no reason not to use it (although a manual definition of the same function can also be easily implemented):
+"""
+
 # ╔═╡ 7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
 import LinearAlgebra: norm
+
+# ╔═╡ cc49ef04-08d8-42bb-9170-9db64e275a51
+md"""
+The energy and force functions are clear to read:
+"""
+
+# ╔═╡ d00e56f2-9d3a-4dd3-80eb-3201eff39b96
+md"""
+And for a unidimensional case, with a defined cutoff, look like:
+"""
 
 # ╔═╡ b5c09cd3-6063-4a36-96cd-2d128aa11b82
 const cutoff = 5.
 
 # ╔═╡ 7719b317-e85b-4583-b401-a8614d4b2373
 md"""
-The function that will compute the force over all pairs will just *naively* run over all the pairs. The function `forces!` will receive as a parameter the function that computes the force between pairs, to allow for its generality.
+The function that will compute the force over all pairs will just *naively* run over all (non-repeated) the pairs. The function `forces!` will receive as a parameter the function that computes the force between pairs, such that this pairwise function can be changed later. 
 
 Inside `forces!`, the `force_pair` function will receive four parameters: the indexes of the particles and their positions. We will use the indexes later. 
 """
@@ -108,6 +151,11 @@ Let us create some points to explain how the function will be called.
 # ╔═╡ dd9e4332-2908-40ef-b461-6b571df56cf4
 md"""
 The function `force_pair`, will be passed to the function that computes the forces to all pairs as *closure*, which will capture the value of the cutoff. The closure also allows us to ignore the indexes of the particles, which are expected by the inner implementation of the function inside `forces`. For example:
+"""
+
+# ╔═╡ 017cd6a8-712d-4ec5-b31f-7f1f507764f2
+md"""
+The third argument of `forces!` function is a *closure*, which can be read as: it is the function that *given* `(i,j,x,y)`, returns `fₓ(x,y,cutoff)`. Thus, it is consistent with the internal call of `fₓ` of `forces!`, and *closes over* the additional parameter `cutoff` required for the computation. 
 """
 
 # ╔═╡ b5206dd5-1f46-4437-929b-efd68393b12b
@@ -134,8 +182,8 @@ $v(t+dt) = v(t) + a(t)*dt$
 function md(
 	x0::Vector{T},
 	v0::Vector{T},
-	mass,dt,nsteps,isave,forces!::F
-) where {T,F}
+	mass,dt,nsteps,isave,forces!
+) where T
 	x = copy(x0)
 	v = copy(v0)
 	a = similar(x0)
@@ -158,6 +206,13 @@ function md(
 	end
 	return trajectory
 end
+
+# ╔═╡ 594ba1d6-2dae-4f20-9546-f52fac17c2f0
+md"""
+By using a parametric type of input (i. e. `Vector{T}`) we can guarantee that an error will be thrown if the positions and velocities are not provided as the same type of variable. 
+
+The `@.` notation is very common in Julia and means that the computation will be performed element-wise.
+"""
 
 # ╔═╡ 66c7d960-7e05-4613-84e8-2a40fe40dc3d
 md"""
@@ -339,12 +394,6 @@ function forces!(f::Vector{T},x::Vector{T},fₓ::F) where {T,F}
 	return f
 end
 
-# ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
-x0 = [ Point2D(100*rand(),100*rand()) for _ in 1:100] 
-
-# ╔═╡ a2226893-4f32-4ec3-aaef-1c304467452c
-f = similar(x0)
-
 # ╔═╡ beeb3335-5c49-47de-a1d3-3eef5f9479f1
 function wrap(x,side)
 	x = rem(x,side)
@@ -413,6 +462,19 @@ function random_point(::Type{Point2D{Measurement{T}}},range,Δ) where T
 	)
 	return p
 end
+
+# ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
+x0 = [ random_point(Point2D{Float64},(0,100)) for _ in 1:100] 
+
+# ╔═╡ d23b4a92-055e-4ed7-bd46-8a3c59312993
+f = similar(x0)
+
+# ╔═╡ e6e29d1e-9a93-49db-a358-6b66f0bc3433
+forces!(
+	f,
+	x0, 
+	(i,j,x,y) -> fₓ(x,y,cutoff) # closure
+) 
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
 trajectory = md((
@@ -2155,26 +2217,34 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
+# ╟─a87fad48-73c1-4a08-a6f1-aae759b3c6fc
+# ╟─172227c2-b27a-40db-91f4-9566c2f6cf52
 # ╟─4b484cf6-4888-4f04-b3fd-94862822b0c0
 # ╠═a82f22e4-f35b-461a-b481-1dff43722e44
 # ╠═8c444ee4-8c77-413a-bbeb-9e5ae2428876
 # ╟─a0de01b5-779a-48c0-8d61-12b02a5f527e
 # ╠═8914ae52-7f09-483a-8ca9-15530aadd371
 # ╟─dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
+# ╟─ab3ff21b-bf82-4d8c-abd1-c27418956ed8
 # ╠═7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
+# ╟─cc49ef04-08d8-42bb-9170-9db64e275a51
 # ╠═df33b999-4a42-4133-bf59-5a65240790cf
 # ╠═0f52365d-34f4-46ed-923e-3ea31c6db0ca
+# ╟─d00e56f2-9d3a-4dd3-80eb-3201eff39b96
 # ╠═b5c09cd3-6063-4a36-96cd-2d128aa11b82
-# ╠═374f239b-6470-40ed-b068-a8ecaace4f09
+# ╟─374f239b-6470-40ed-b068-a8ecaace4f09
 # ╟─7719b317-e85b-4583-b401-a8614d4b2373
 # ╠═f58769a6-a656-42a3-8bc6-c204d4cfd897
 # ╟─144119ad-ab88-4165-883a-f2fc2464a838
 # ╠═356ac5a4-c94e-42cb-a085-0198b29c7e52
-# ╠═43e6b146-ee35-40f1-b540-3da22b9e1b1b
-# ╠═a2226893-4f32-4ec3-aaef-1c304467452c
+# ╟─43e6b146-ee35-40f1-b540-3da22b9e1b1b
 # ╟─dd9e4332-2908-40ef-b461-6b571df56cf4
+# ╠═d23b4a92-055e-4ed7-bd46-8a3c59312993
+# ╠═e6e29d1e-9a93-49db-a358-6b66f0bc3433
+# ╟─017cd6a8-712d-4ec5-b31f-7f1f507764f2
 # ╟─b5206dd5-1f46-4437-929b-efd68393b12b
 # ╠═eb5dc224-1491-11ec-1cae-d51c93cd292c
+# ╟─594ba1d6-2dae-4f20-9546-f52fac17c2f0
 # ╟─66c7d960-7e05-4613-84e8-2a40fe40dc3d
 # ╟─e717a8d9-ccfb-4f89-b2a2-f244f108b48d
 # ╠═3755a4f3-1842-4de2-965e-d294c06c54c7
