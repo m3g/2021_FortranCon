@@ -908,7 +908,7 @@ end
 
 # ╔═╡ f289955b-0239-4b8d-ba08-2edf0a7284c2
 md"""
-### A physical system: a Ne gas
+### A physical system: Neon gas
 
 We will compute the energy of a Ne gas with 10k particles, with density $\sim 0.1$ particles/Å³, which is roughly the atomic density of liquid water. 
 
@@ -2248,7 +2248,7 @@ version = "0.9.1+5"
 # ╟─66c7d960-7e05-4613-84e8-2a40fe40dc3d
 # ╟─e717a8d9-ccfb-4f89-b2a2-f244f108b48d
 # ╠═3755a4f3-1842-4de2-965e-d294c06c54c7
-# ╠═505ef5ab-f131-4ab3-a723-795b5eb5dc0f
+# ╟─505ef5ab-f131-4ab3-a723-795b5eb5dc0f
 # ╟─eab7b195-64d5-4587-8687-48a673ab091b
 # ╟─ed35d044-8506-4ec0-a2d3-03202d0c29a5
 # ╟─101ac577-6f2f-41a7-852f-d1de22c597e3
@@ -2262,7 +2262,7 @@ version = "0.9.1+5"
 # ╟─fcff6973-012a-40fc-a618-f6262266287a
 # ╠═985b4ffb-7964-4b50-8c2f-e5f45f352500
 # ╟─c4798182-de75-4b59-8be7-f7cf1051364d
-# ╠═efc586a2-0946-4dc5-ab3a-3902a811f3ad
+# ╟─efc586a2-0946-4dc5-ab3a-3902a811f3ad
 # ╟─22fb0386-d4fa-47b9-ac31-decf2731cbc1
 # ╠═d42f842d-6c2a-40db-b0c4-e936244a9e7c
 # ╠═1ad401b5-20b2-489b-b2aa-92f729b1d725
@@ -2272,7 +2272,7 @@ version = "0.9.1+5"
 # ╠═1ce41841-1ca7-43e4-a08a-21142e29ed93
 # ╟─2aef27bd-dea6-4a93-9d0f-b9249c9dd2cd
 # ╠═0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
-# ╠═4a498c18-406f-4437-b378-aa9fdc75b919
+# ╟─4a498c18-406f-4437-b378-aa9fdc75b919
 # ╟─b6dcb9a3-59e3-4eae-9399-fb072c704f1a
 # ╠═e4657169-1bb2-4d4a-ac9d-adc80499d07d
 # ╠═e9376a4b-3d60-42eb-8681-cd2bcec13fe8
@@ -2290,7 +2290,7 @@ version = "0.9.1+5"
 # ╠═b31da90d-7165-42de-b18d-90584affea03
 # ╠═d87c22d1-d595-4d43-ab1c-f28d282a3485
 # ╟─1d6eedfd-d013-4557-9cf2-103f8fb7b72a
-# ╠═bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
+# ╟─bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
 # ╟─c003a61d-a434-4d7b-9214-5b52aa044248
 # ╠═e24ce081-e367-4feb-8a79-66b8654a0b3a
 # ╟─63eb391f-0238-434a-bc3a-2fa8ed41448e
@@ -2302,7 +2302,7 @@ version = "0.9.1+5"
 # ╠═57141f7c-9261-4dc5-98e4-b136a15f86fc
 # ╟─055e32d7-073c-40db-a267-750636b9f786
 # ╠═aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
-# ╠═1067527e-76b7-4331-b3ab-efd72fb99dfc
+# ╟─1067527e-76b7-4331-b3ab-efd72fb99dfc
 # ╟─c4344e64-aa22-4328-a97a-71e44bcd289f
 # ╟─827bda6f-87d4-4d36-8d89-f144f4595240
 # ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
@@ -2376,7 +2376,7 @@ version = "0.9.1+5"
 # ╟─591e6a9c-444c-471f-a56b-4dfbc9111989
 # ╟─1f265576-824a-4764-a738-685554068079
 # ╠═339487cd-8ee8-4d1d-984b-b4c5ff00bae3
-# ╠═9cb29b01-7f49-4145-96d8-c8fd971fe1c8
+# ╟─9cb29b01-7f49-4145-96d8-c8fd971fe1c8
 # ╟─ac52a71b-1138-4f1b-99c3-c174d9f09187
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
