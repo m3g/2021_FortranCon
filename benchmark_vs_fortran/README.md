@@ -63,7 +63,7 @@ end
 elemental real(dp) function wrap(x,side)
     implicit none
     real(dp), intent(in) :: x, side
-    wrap = dmod(x,side)
+    wrap = mod(x,side)
     if (wrap >= side/2) then
         wrap = wrap - side
     else if (wrap < -side/2) then
