@@ -3,7 +3,7 @@
 </p>
 
 <p align=center>
-  <h2>Particle simulations with Julia<h2><br>
+  <h2>Particle simulations with Julia</h2><br>
   Leandro Martínez<br>
   <i>Institute of Chemistry and Center for Computing in Engineering and Sciences</i><br>
   <b>University of Campinas</b>
