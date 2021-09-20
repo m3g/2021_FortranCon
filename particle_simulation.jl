@@ -90,6 +90,11 @@ md"""
 For convenience, here we will also define a function that returns a random point of tyis type, given a range of coordinates:
 """
 
+# ╔═╡ 532eb3bc-5522-4348-afa5-5336ec6752c7
+md"""
+In the function above we took care of making it generic for the type and dimension of the point desired, such that we do not need to redefine it later when peforming simulations with different point structures. 
+"""
+
 # ╔═╡ dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 md"""
 ## Force between a pair of particles 
@@ -171,7 +176,7 @@ $f(t) = f(x)$
 $x(t + dt) = x(t) + v(t)dt + a(t)dt^2/2$
 
 3. Update the velocities:
-$v(t+dt) = v(t) + a(t)*dt$
+$v(t+dt) = v(t) + a(t)dt$
 
 4. Goto 1.
 
@@ -231,23 +236,6 @@ md"""
 Our particles just explode, since they have initial random velocities and there are only repulsive interactions. 
 
 We have a more interesting dynamics if we use periodic boundary conditions. To do so, we will update how the forces are computed.
-
-We need all arithmetics of the points and some other point operations, like how to iterate over the point coordinates. Let us save our time using an implementation of that:
-"""
-
-# ╔═╡ ed35d044-8506-4ec0-a2d3-03202d0c29a5
-md"""
-The `Point2D` structure above, by being a subtype of `FieldVector` from `StaticArrays`, has already all the arithmetics defined. 
-"""
-
-# ╔═╡ 101ac577-6f2f-41a7-852f-d1de22c597e3
-md"""
-We only need to define our custom random point generator:
-"""
-
-# ╔═╡ 367a686c-4cab-4f13-b285-c3243168cfb1
-md"""
-And steal the `norm` function from `LinearAlgebra`, which cannot be directly used here just because it conflicts with our previous definition of `norm`.
 """
 
 # ╔═╡ 34dc72dc-4864-47c0-b730-183f67e7aea3
@@ -272,7 +260,12 @@ const side = 100.
 
 # ╔═╡ fcff6973-012a-40fc-a618-f6262266287a
 md"""
-To run the simulation with the new periodic forces, we use the same `md` function, just passing the new `fₓ` function:
+To run the simulation with the new periodic forces, we use the same `md` function, just passing the new `fₓ` function in the *closure* definition:
+"""
+
+# ╔═╡ 14867ffd-cde5-43f8-8399-01169ee29b73
+md"""
+A relevant detail here is that we could use the same `fₓ` name for the function, because it receives the `side` of the box as a parameter, and multiple-dispatch then chooses the correct method automaticaly. 
 """
 
 # ╔═╡ c4798182-de75-4b59-8be7-f7cf1051364d
@@ -283,6 +276,11 @@ While plotting the trajectory, we will wrap the coordinates:
 # ╔═╡ 22fb0386-d4fa-47b9-ac31-decf2731cbc1
 md"""
 ## Benchmarking
+"""
+
+# ╔═╡ 8e23a3ea-3039-4a5f-b37f-c4710153938e
+md"""
+Benchmarkming in Julia can be done with the `@time` macro or the macros from the `BenchmarkTools` package. Compilation occurs on the first call to each method, and the macros from `BenchmarkTools` discount the compilation time automatically. 
 """
 
 # ╔═╡ 2a3e7257-63ad-4761-beda-cec18b91f99c
@@ -319,8 +317,7 @@ md"""
 
 Performing simulations in different dimensions is not the most interesting, or most useful property of generic programming. We can, more interestingly, propagate the error in the positions of the particles, simply by defining a type of particle that carries both the position and the cumulative error. 
 
-The concept is identical to what we have done initialy when we defined `Point` and its arithmetics. We would need to define a new type of structure carrying the positions and the errors, and define the appropriate error propagataion arithmetics for the operations that will be performed with that type of variable. 
-
+A small example of how that can be done is shown. First, we create a type of variable that carries both the coordinates and the uncertainty on the coordinates:
 """
 
 # ╔═╡ e4657169-1bb2-4d4a-ac9d-adc80499d07d
@@ -329,11 +326,21 @@ struct MyMeasurement{T}
 	Δx::T
 end
 
+# ╔═╡ 5d395353-5681-4780-983e-902fdb89eaf2
+md"""
+and we will overload the printing of this variables to make things prettier:
+"""
+
 # ╔═╡ e9376a4b-3d60-42eb-8681-cd2bcec13fe8
 Base.show(io::IO,m::MyMeasurement) = println(io," $(m.x) ± $(m.Δx)")
 
 # ╔═╡ c5cdd71f-5ded-482f-9205-c13f01a14d0b
 m = MyMeasurement(1.0,0.1)
+
+# ╔═╡ a0993a1f-60a6-45b5-815e-676c49a9f049
+md"""
+Now we define the arithmetics for this type of variable. For example, the sum of two `MyMeasurement`s sums the uncertainties, but so do the subtraction. The other uncertainties are also propagaged linearly, according to the first derivative of their operations relative to the values:
+"""
 
 # ╔═╡ 4e7f8db4-b5cc-4a3e-9fa7-e62d8f2a36ac
 begin
@@ -347,13 +354,14 @@ begin
 	^(m::MyMeasurement{T},n) where T = MyMeasurement{T}(m.x^n,n*m.x^(n-1)*m.Δx)
 end
 
-# ╔═╡ 8914ae52-7f09-483a-8ca9-15530aadd371
-function random_point(::Type{Point2D{T}},range) where T 
-	p = Point2D(
-		range[begin] + rand(T)*(range[end]-range[begin]),
-		range[begin] + rand(T)*(range[end]-range[begin])
-	)
-	return p
+# ╔═╡ f87e4036-8f82-41c7-90c1-daa5f677488d
+function random_point(::Type{PointType},range) where PointType 
+	dim = length(PointType)
+    T = eltype(PointType)
+    p = PointType(
+           range[begin] + rand(T)*(range[end]-range[begin]) for _ in 1:dim
+    )
+    return p
 end
 
 # ╔═╡ df33b999-4a42-4133-bf59-5a65240790cf
@@ -417,31 +425,42 @@ function fₓ(x::T,y::T,cutoff,side) where T
 	return fₓ
 end
 
-# ╔═╡ 1ce41841-1ca7-43e4-a08a-21142e29ed93
-function random_point(::Type{Point3D{T}},range) where T 
-	p = Point3D(
-		range[begin] + rand(T)*(range[end]-range[begin]),
-		range[begin] + rand(T)*(range[end]-range[begin]),
-		range[begin] + rand(T)*(range[end]-range[begin])
-	)
-	return p
-end
+# ╔═╡ 36da3e92-000c-4d4b-9abf-4cd588b3a354
+md"""
+With such definitions, we can operate over variables of type `MyMeasurement`, propagating automatically the uncertainty along the operations:
+"""
 
 # ╔═╡ 70eb2e0a-a5c8-4975-8f6c-589035bea29c
 sqrt((2*(m + 4*m)^2/3))
 
+# ╔═╡ b4646a29-3efd-4bd1-bffc-3575559de937
+md"""
+And we can also define a 2D (or 3D) point of values with uncertainties, without changing the previous definitions of these points:
+"""
+
 # ╔═╡ d32743c0-fc80-406f-83c5-4528e439589a
 x = Point2D(MyMeasurement(1.0,0.1),MyMeasurement(2.0,0.2))
+
+# ╔═╡ 98478246-5940-4828-a8f1-9c9fa990676d
+md"""
+And now operations on this point propagate the uncertainties of the componentes as well:
+"""
 
 # ╔═╡ 310f247e-3fe8-4621-ae0b-b5ee38d2ee89
 2*x .+ sqrt.(x)
 
 # ╔═╡ 8267220a-f06e-4761-b310-00f8ba44e4b1
 md"""
+Progapating uncertainties in more general scenarios requires the definition of other propagation rules. Also, one might want to consider the correlation between variables, which makes the propagation rules more complicated and expensive.
 
 Fortunately, there are some package that provide the error propagation in more general scenarios, by defining the proper progagation rules. 
 
-Here, we use the `Measurements`  package:
+Here, we use the `Measurements`  package.
+"""
+
+# ╔═╡ ce916139-221a-462e-877f-88212663c05e
+md"""
+### Using `Measurements`
 """
 
 # ╔═╡ 8e2903be-4975-4e14-84ed-6e712f47fe47
@@ -528,6 +547,11 @@ Which generates random points carrying an initial uncertainty we defined:
 # ╔═╡ b31da90d-7165-42de-b18d-90584affea03
 random_point(Point2D{Measurement{Float64}},(-50,50),1e-5)
 
+# ╔═╡ 5f37640b-ffd9-4877-a78c-a699b2671919
+md"""
+That given, the same simulation codes can be used to run the particles simulations while propagating the uncertinties of the coordinates of each point:
+"""
+
 # ╔═╡ 1d6eedfd-d013-4557-9cf2-103f8fb7b72a
 md"""
 The trajectory, of course, looks the same (except that we ran less steps, because propagating the error is expensive):
@@ -540,6 +564,8 @@ But now we have an estimate of the error of the positions, propagated from the i
 
 # ╔═╡ 63eb391f-0238-434a-bc3a-2fa8ed41448e
 md"""
+### Planetary motion
+
 Perhaps this is more interesting to see in a planetary trajectory:
 """
 
@@ -604,6 +630,11 @@ trajectory_planets = md((
 	)
 )...)
 
+# ╔═╡ 93697e4d-369b-48e9-8b28-a0ff58604d02
+md"""
+If you are wandering why the errors oscilate, it is because the trajectories are periodic. Whenever all possible trajectories starting from within the uncertainty interval cross each other, the error of the predicted position is independent on the initial coordinates. Thus, the derivative of the uncertainty is zero relative to the position, and so it the propagated uncertainty when using a linear propagation rule.
+"""
+
 # ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
 md"""
 One thing I don't like, though, is that in two years the earth did not complete two  revolutions around the sun. Something is wrong with our data. Can we improve that?
@@ -618,6 +649,11 @@ Perhaps astoningshly (at least for me), our simulation is completely differentia
 Here we speculate that what was wrong with our data was that the initial position of the earth was somewhat out of place. That caused the earth orbit to be slower than it should.
 
 We will define, then, an objective function which returns the displacement of the earth relative to its initial position (at day one) after one year. Our goal is that after one year the earth returns to its initial position.
+"""
+
+# ╔═╡ 1ff4077a-4742-4c5e-a8d6-c4699469a683
+md"""
+First, se define a function that executes a simulation of *one year* of an earth orbit, starting from a given position for the earth `x` coordinate as a parameter. We will be careful in making all other coordinates of the same type of `x`, so that the generality of the type of variable being used is kept consistent:
 """
 
 # ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
@@ -645,20 +681,42 @@ function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
 	return trajectory
 end
 
+# ╔═╡ 3ae783ce-d06e-4cc2-b8a3-94512e8f1490
+md"""
+Now we define our objective function, consisting of the norm of the difference between the initial and final coordinates of the earth after one  year (what we want is that the earth returns to its initial position):
+"""
+
 # ╔═╡ 13e7da81-8581-4f32-9fdb-2599dd36a12c
 function error_in_orbit(x::T=149.6) where T
 	traj = earth_orbit(x,365,365) # Save one point only
 	return norm(traj[end][2]-[x,0.])
 end
 
+# ╔═╡ 4870b1f3-3134-4ddc-a59d-fa806b456a23
+md"""
+We can see that our current data results in a significant error:
+"""
+
 # ╔═╡ fda6171c-9675-4f2e-b226-7ccf100529cd
 error_in_orbit()
+
+# ╔═╡ a862f8a3-0131-4644-bc90-246bf3120790
+md"""
+We want to minimize this error, and it turns out that your simulation is fully differentiable. We will use here the `ForwardDiff` automatic differentiation package:
+"""
+
+# ╔═╡ eee3ac4b-4ddb-4699-b6e6-f0ffcc562c07
+md"""
+Which can be used just as it it to compute the derivative of the error in the orbit relative to the initial `x` position of the Earth:
+"""
 
 # ╔═╡ 107aec28-ecb5-4007-95e5-25d0a7f0c465
 ForwardDiff.derivative(error_in_orbit,149.6)
 
-# ╔═╡ b8320f78-323c-49a9-a9f9-2748d19ecb35
-error_derivative(x) = ForwardDiff.derivative(error_in_orbit,x)
+# ╔═╡ 1394e4c6-c371-47c0-8ca8-f0830d63d8ec
+md"""
+To minimize the error in the orbit we will write a simple stepest descent algorithm. Many packages are available for optimization, but here we will keep things simpler also to illustrate that writting the optimizer in Julia is a valid alternative:
+"""
 
 # ╔═╡ 535716e6-9c1c-4324-a4cd-b1214df3c01d
 function gradient_descent(x,f,g,tol,maxtrial)
@@ -682,15 +740,33 @@ function gradient_descent(x,f,g,tol,maxtrial)
 	return x, gx, itrial
 end
 
+# ╔═╡ b8edfb4e-6780-4ce7-94c1-4073ff7fa832
+md"""
+The derivative of our error can be computed by *closing over* the `error_in_orbit` function:
+"""
+
+# ╔═╡ b8320f78-323c-49a9-a9f9-2748d19ecb35
+error_derivative(x) = ForwardDiff.derivative(error_in_orbit,x)
+
+# ╔═╡ 92737d73-676c-4c96-a321-831ecaf37690
+md"""
+And now we can call the `gradient_descent` function directly:
+"""
+
 # ╔═╡ 931a9c5f-8f91-4e88-956b-50c0efc9c58b
 best_x0 = gradient_descent(149.6,error_in_orbit,error_derivative,1e-4,1000)
+
+# ╔═╡ b5b96082-efde-464f-bcd4-f2e0a84befcd
+md"""
+The result is reasonable: the error in the orbit has significantly being disminished:
+"""
 
 # ╔═╡ 7658a32c-d3da-4ec9-9d96-0d30bb18f08c
 error_in_orbit(best_x0[1])
 
 # ╔═╡ e61981d5-5448-45e9-81dc-320ac87ba813
 md"""
-Seems that it worked! Let us see our trajectory now with the new initial condition:
+Let us see our trajectory now with the new initial condition:
 """
 
 # ╔═╡ 31e1bb51-c531-4c4a-8634-5caafb7e9e51
@@ -698,6 +774,11 @@ earth_traj_0 = earth_orbit(149.6)
 
 # ╔═╡ b0b81da4-6788-45c4-b618-188a02b5e09c
 earth_traj_best = earth_orbit(best_x0[1])
+
+# ╔═╡ 47c205c3-ceae-4e12-9ade-753df1608deb
+md"""
+The dark blue dot is the corrected trajectory, and the light blue dot is the original one. Therefore, we were able to optimize the *initial point* of the trajectory with a gradient-based method. This concept can be used for adjusting parameters in simulations of many kinds (particle simulations or differential equations in general).
+"""
 
 # ╔═╡ 826693ff-9a9b-46b1-aeb3-767a5e6f9441
 md"""
@@ -1206,7 +1287,7 @@ t_Ne = @elapsed trajectory_Ne = md((
 	v0 = [random_point(Point3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
 	mass = [ 20.179 for _ in 1:n_Ne ],
 	dt = 0.01,
-	nsteps = 1000,
+	nsteps = 100,
 	isave = 10,
 	forces! = (f,x) -> flj!(f,x,ε,σ,box_Ne,cl_Ne)
 )...)
@@ -2223,7 +2304,8 @@ version = "0.9.1+5"
 # ╠═a82f22e4-f35b-461a-b481-1dff43722e44
 # ╠═8c444ee4-8c77-413a-bbeb-9e5ae2428876
 # ╟─a0de01b5-779a-48c0-8d61-12b02a5f527e
-# ╠═8914ae52-7f09-483a-8ca9-15530aadd371
+# ╠═f87e4036-8f82-41c7-90c1-daa5f677488d
+# ╠═532eb3bc-5522-4348-afa5-5336ec6752c7
 # ╟─dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 # ╟─ab3ff21b-bf82-4d8c-abd1-c27418956ed8
 # ╠═7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
@@ -2250,9 +2332,6 @@ version = "0.9.1+5"
 # ╠═3755a4f3-1842-4de2-965e-d294c06c54c7
 # ╟─505ef5ab-f131-4ab3-a723-795b5eb5dc0f
 # ╟─eab7b195-64d5-4587-8687-48a673ab091b
-# ╟─ed35d044-8506-4ec0-a2d3-03202d0c29a5
-# ╟─101ac577-6f2f-41a7-852f-d1de22c597e3
-# ╟─367a686c-4cab-4f13-b285-c3243168cfb1
 # ╟─34dc72dc-4864-47c0-b730-183f67e7aea3
 # ╠═beeb3335-5c49-47de-a1d3-3eef5f9479f1
 # ╟─02d9bf3b-708c-4293-b198-9043b334ff7e
@@ -2261,33 +2340,41 @@ version = "0.9.1+5"
 # ╠═b2a4a505-47ff-40bb-9a6d-a08d91c53217
 # ╟─fcff6973-012a-40fc-a618-f6262266287a
 # ╠═985b4ffb-7964-4b50-8c2f-e5f45f352500
+# ╟─14867ffd-cde5-43f8-8399-01169ee29b73
 # ╟─c4798182-de75-4b59-8be7-f7cf1051364d
-# ╟─efc586a2-0946-4dc5-ab3a-3902a811f3ad
+# ╠═efc586a2-0946-4dc5-ab3a-3902a811f3ad
 # ╟─22fb0386-d4fa-47b9-ac31-decf2731cbc1
+# ╟─8e23a3ea-3039-4a5f-b37f-c4710153938e
 # ╠═d42f842d-6c2a-40db-b0c4-e936244a9e7c
 # ╠═1ad401b5-20b2-489b-b2aa-92f729b1d725
 # ╟─2a3e7257-63ad-4761-beda-cec18b91f99c
 # ╟─49b1f040-929a-4238-acd9-6554757b592c
 # ╠═26d5c6e9-a903-4792-a0e0-dec1a2e86a01
-# ╠═1ce41841-1ca7-43e4-a08a-21142e29ed93
 # ╟─2aef27bd-dea6-4a93-9d0f-b9249c9dd2cd
 # ╠═0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
 # ╟─4a498c18-406f-4437-b378-aa9fdc75b919
 # ╟─b6dcb9a3-59e3-4eae-9399-fb072c704f1a
 # ╠═e4657169-1bb2-4d4a-ac9d-adc80499d07d
+# ╟─5d395353-5681-4780-983e-902fdb89eaf2
 # ╠═e9376a4b-3d60-42eb-8681-cd2bcec13fe8
 # ╠═c5cdd71f-5ded-482f-9205-c13f01a14d0b
+# ╟─a0993a1f-60a6-45b5-815e-676c49a9f049
 # ╠═4e7f8db4-b5cc-4a3e-9fa7-e62d8f2a36ac
+# ╟─36da3e92-000c-4d4b-9abf-4cd588b3a354
 # ╠═70eb2e0a-a5c8-4975-8f6c-589035bea29c
+# ╟─b4646a29-3efd-4bd1-bffc-3575559de937
 # ╠═d32743c0-fc80-406f-83c5-4528e439589a
+# ╟─98478246-5940-4828-a8f1-9c9fa990676d
 # ╠═310f247e-3fe8-4621-ae0b-b5ee38d2ee89
 # ╟─8267220a-f06e-4761-b310-00f8ba44e4b1
+# ╟─ce916139-221a-462e-877f-88212663c05e
 # ╠═99b5c818-a825-4939-849e-1cade802f63d
 # ╟─8e2903be-4975-4e14-84ed-6e712f47fe47
 # ╟─418f31bb-81d5-459b-b402-4fd4e3f4ab27
 # ╠═05402cbd-78c6-4234-8680-c351c8c37778
 # ╟─4e97f24c-c237-4117-bc57-e4e88c8fb8d2
 # ╠═b31da90d-7165-42de-b18d-90584affea03
+# ╟─5f37640b-ffd9-4877-a78c-a699b2671919
 # ╠═d87c22d1-d595-4d43-ab1c-f28d282a3485
 # ╟─1d6eedfd-d013-4557-9cf2-103f8fb7b72a
 # ╟─bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
@@ -2303,20 +2390,31 @@ version = "0.9.1+5"
 # ╟─055e32d7-073c-40db-a267-750636b9f786
 # ╠═aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
 # ╟─1067527e-76b7-4331-b3ab-efd72fb99dfc
+# ╟─93697e4d-369b-48e9-8b28-a0ff58604d02
 # ╟─c4344e64-aa22-4328-a97a-71e44bcd289f
 # ╟─827bda6f-87d4-4d36-8d89-f144f4595240
+# ╟─1ff4077a-4742-4c5e-a8d6-c4699469a683
 # ╠═4a75498d-8f4e-406f-8b01-f6a5f153919f
+# ╟─3ae783ce-d06e-4cc2-b8a3-94512e8f1490
 # ╠═13e7da81-8581-4f32-9fdb-2599dd36a12c
+# ╟─4870b1f3-3134-4ddc-a59d-fa806b456a23
 # ╠═fda6171c-9675-4f2e-b226-7ccf100529cd
+# ╟─a862f8a3-0131-4644-bc90-246bf3120790
 # ╠═d6564250-f646-40de-9463-a956af1a5b1d
+# ╟─eee3ac4b-4ddb-4699-b6e6-f0ffcc562c07
 # ╠═107aec28-ecb5-4007-95e5-25d0a7f0c465
-# ╠═b8320f78-323c-49a9-a9f9-2748d19ecb35
+# ╟─1394e4c6-c371-47c0-8ca8-f0830d63d8ec
 # ╠═535716e6-9c1c-4324-a4cd-b1214df3c01d
+# ╟─b8edfb4e-6780-4ce7-94c1-4073ff7fa832
+# ╠═b8320f78-323c-49a9-a9f9-2748d19ecb35
+# ╟─92737d73-676c-4c96-a321-831ecaf37690
 # ╠═931a9c5f-8f91-4e88-956b-50c0efc9c58b
+# ╟─b5b96082-efde-464f-bcd4-f2e0a84befcd
 # ╠═7658a32c-d3da-4ec9-9d96-0d30bb18f08c
 # ╟─e61981d5-5448-45e9-81dc-320ac87ba813
 # ╠═31e1bb51-c531-4c4a-8634-5caafb7e9e51
 # ╠═b0b81da4-6788-45c4-b618-188a02b5e09c
+# ╟─47c205c3-ceae-4e12-9ade-753df1608deb
 # ╟─4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 # ╟─826693ff-9a9b-46b1-aeb3-767a5e6f9441
 # ╟─53cedd26-3742-4c23-a8b8-8a1f2bdfa135
@@ -2376,7 +2474,7 @@ version = "0.9.1+5"
 # ╟─591e6a9c-444c-471f-a56b-4dfbc9111989
 # ╟─1f265576-824a-4764-a738-685554068079
 # ╠═339487cd-8ee8-4d1d-984b-b4c5ff00bae3
-# ╟─9cb29b01-7f49-4145-96d8-c8fd971fe1c8
+# ╠═9cb29b01-7f49-4145-96d8-c8fd971fe1c8
 # ╟─ac52a71b-1138-4f1b-99c3-c174d9f09187
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
