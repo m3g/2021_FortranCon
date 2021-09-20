@@ -24,13 +24,13 @@ using FastPow
 
 # ╔═╡ 7c792b6b-b6ee-4e30-88d5-d0b8064f2734
 begin
-	using Plots
-	plot_font = "Computer Modern"
-	default(
-		fontfamily=plot_font,
-		linewidth=2, framestyle=:box, label=:none, grid=false,
-		size=(400,400)
-	)	
+    using Plots
+    plot_font = "Computer Modern"
+    default(
+        fontfamily=plot_font,
+        linewidth=2, framestyle=:box, label=:none, grid=false,
+        size=(400,400)
+    )    
 end
 
 # ╔═╡ febe8c06-b3aa-4db1-a3ea-fdc2a81bdebd
@@ -79,8 +79,8 @@ We define a simple point in 2D space, with coordinates `x` and `y`. The point wi
 
 # ╔═╡ 8c444ee4-8c77-413a-bbeb-9e5ae2428876
 struct Point2D{T} <: FieldVector{2,T}
-	x::T
-	y::T
+    x::T
+    y::T
 end
 
 # ╔═╡ a0de01b5-779a-48c0-8d61-12b02a5f527e
@@ -183,31 +183,31 @@ $v(t+dt) = v(t) + a(t)dt$
 
 # ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
 function md(
-	x0::Vector{T},
-	v0::Vector{T},
-	mass,dt,nsteps,isave,forces!
+    x0::Vector{T},
+    v0::Vector{T},
+    mass,dt,nsteps,isave,forces!
 ) where T
-	x = copy(x0)
-	v = copy(v0)
-	a = similar(x0)
-	f = similar(x0)
-	trajectory = [ copy(x0) ] # will store the trajectory
-	for step in 1:nsteps
-		# Compute forces
-		forces!(f,x)
-		# Accelerations
-		@. a = f / mass
-		# Update positions
-		@. x = x + v*dt + a*dt^2/2
-		# Update velocities
-		@. v = v + a*dt
-		# Save if required
-		if mod(step,isave) == 0
-			println("Saved trajectory at step: ",step)
-			push!(trajectory,copy(x))
-		end
-	end
-	return trajectory
+    x = copy(x0)
+    v = copy(v0)
+    a = similar(x0)
+    f = similar(x0)
+    trajectory = [ copy(x0) ] # will store the trajectory
+    for step in 1:nsteps
+        # Compute forces
+        forces!(f,x)
+        # Accelerations
+        @. a = f / mass
+        # Update positions
+        @. x = x + v*dt + a*dt^2/2
+        # Update velocities
+        @. v = v + a*dt
+        # Save if required
+        if mod(step,isave) == 0
+            println("Saved trajectory at step: ",step)
+            push!(trajectory,copy(x))
+        end
+    end
+    return trajectory
 end
 
 # ╔═╡ 594ba1d6-2dae-4f20-9546-f52fac17c2f0
@@ -299,9 +299,9 @@ Not much is needed to just run the simulation in three dimensions. We only need 
 
 # ╔═╡ 26d5c6e9-a903-4792-a0e0-dec1a2e86a01
 struct Point3D{T} <: FieldVector{3,T}
-	x::T
-	y::T
-	z::T
+    x::T
+    y::T
+    z::T
 end
 
 # ╔═╡ 2aef27bd-dea6-4a93-9d0f-b9249c9dd2cd
@@ -320,8 +320,8 @@ A small example of how that can be done is shown. First, we create a type of var
 
 # ╔═╡ e4657169-1bb2-4d4a-ac9d-adc80499d07d
 struct MyMeasurement{T}
-	x::T
-	Δx::T
+    x::T
+    Δx::T
 end
 
 # ╔═╡ 5d395353-5681-4780-983e-902fdb89eaf2
@@ -342,19 +342,19 @@ Now we define the arithmetics for this type of variable. For example, the sum of
 
 # ╔═╡ 4e7f8db4-b5cc-4a3e-9fa7-e62d8f2a36ac
 begin
-	import Base: -, +, *, /, ^, sqrt
-	+(m1::MyMeasurement,m2::MyMeasurement) = MyMeasurement(m1.x+m2.x,m1.Δx+m2.Δx)
-	-(m1::MyMeasurement,m2::MyMeasurement) = MyMeasurement(m1.x-m2.x,m1.Δx+m2.Δx)
-	*(α,m::MyMeasurement) = MyMeasurement(α*m.x,sign(α)*α*m.Δx)
-	*(m::MyMeasurement,α) = α*m
-	/(m::MyMeasurement,α) = inv(α)*m
-	sqrt(m::MyMeasurement{T}) where T = MyMeasurement(sqrt(m.x),inv(2*sqrt(m.x))*m.Δx)
-	^(m::MyMeasurement{T},n) where T = MyMeasurement{T}(m.x^n,n*m.x^(n-1)*m.Δx)
+    import Base: -, +, *, /, ^, sqrt
+    +(m1::MyMeasurement,m2::MyMeasurement) = MyMeasurement(m1.x+m2.x,m1.Δx+m2.Δx)
+    -(m1::MyMeasurement,m2::MyMeasurement) = MyMeasurement(m1.x-m2.x,m1.Δx+m2.Δx)
+    *(α,m::MyMeasurement) = MyMeasurement(α*m.x,sign(α)*α*m.Δx)
+    *(m::MyMeasurement,α) = α*m
+    /(m::MyMeasurement,α) = inv(α)*m
+    sqrt(m::MyMeasurement{T}) where T = MyMeasurement(sqrt(m.x),inv(2*sqrt(m.x))*m.Δx)
+    ^(m::MyMeasurement{T},n) where T = MyMeasurement{T}(m.x^n,n*m.x^(n-1)*m.Δx)
 end
 
 # ╔═╡ f87e4036-8f82-41c7-90c1-daa5f677488d
 function random_point(::Type{PointType},range) where PointType 
-	dim = length(PointType)
+    dim = length(PointType)
     T = eltype(PointType)
     p = PointType(
            range[begin] + rand(T)*(range[end]-range[begin]) for _ in 1:dim
@@ -364,63 +364,63 @@ end
 
 # ╔═╡ df33b999-4a42-4133-bf59-5a65240790cf
 function energy(x::T,y::T,cutoff) where T
-	Δv = y - x
-	d = norm(Δv)
-	if d > cutoff
-		energy = zero(T)
-	else
-		energy = (d - cutoff)^2
-	end
-	return energy
+    Δv = y - x
+    d = norm(Δv)
+    if d > cutoff
+        energy = zero(T)
+    else
+        energy = (d - cutoff)^2
+    end
+    return energy
 end
 
 # ╔═╡ 0f52365d-34f4-46ed-923e-3ea31c6db0ca
 function fₓ(x::T,y::T,cutoff) where T
-	Δv = y - x
-	d = norm(Δv)
-	if d > cutoff
-		fₓ = zero(T)
-	else
-		fₓ = 2*(d - cutoff)*(Δv/d)
-	end
-	return fₓ
+    Δv = y - x
+    d = norm(Δv)
+    if d > cutoff
+        fₓ = zero(T)
+    else
+        fₓ = 2*(d - cutoff)*(Δv/d)
+    end
+    return fₓ
 end
 
 # ╔═╡ f58769a6-a656-42a3-8bc6-c204d4cfd897
 function forces!(f::Vector{T},x::Vector{T},fₓ::F) where {T,F}
-	fill!(f,zero(T))
-	n = length(x)
-	for i in 1:n-1
-		for j in i+1:n
-			fᵢ = fₓ(i,j,x[i],x[j])
-			f[i] += fᵢ 
-			f[j] -= fᵢ
-		end
-	end
-	return f
+    fill!(f,zero(T))
+    n = length(x)
+    for i in 1:n-1
+        for j in i+1:n
+            fᵢ = fₓ(i,j,x[i],x[j])
+            f[i] += fᵢ 
+            f[j] -= fᵢ
+        end
+    end
+    return f
 end
 
 # ╔═╡ beeb3335-5c49-47de-a1d3-3eef5f9479f1
 function wrap(x,side)
-	x = rem(x,side)
-	if x >= side/2
-		x -= side
-	elseif x < -side/2
-		x += side
-	end
-	return x
+    x = rem(x,side)
+    if x >= side/2
+        x -= side
+    elseif x < -side/2
+        x += side
+    end
+    return x
 end
 
 # ╔═╡ 0967b90d-ac88-476d-a57a-7c38dfa82204
 function fₓ(x::T,y::T,cutoff,side) where T
-	Δv = wrap.(y - x, side)
-	d = norm(Δv)
-	if d > cutoff
-		fₓ = zero(T)
-	else
-		fₓ = 2*(d - cutoff)*(Δv/d)
-	end
-	return fₓ
+    Δv = wrap.(y - x, side)
+    d = norm(Δv)
+    if d > cutoff
+        fₓ = zero(T)
+    else
+        fₓ = 2*(d - cutoff)*(Δv/d)
+    end
+    return fₓ
 end
 
 # ╔═╡ 36da3e92-000c-4d4b-9abf-4cd588b3a354
@@ -472,12 +472,12 @@ We need to redefine your initial random point generator only:
 """
 
 # ╔═╡ 05402cbd-78c6-4234-8680-c351c8c37778
-function random_point(::Type{Point2D{Measurement{T}}},range,Δ) where T	
-	p = Point2D(
-		range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ,
-		range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ
-	)
-	return p
+function random_point(::Type{Point2D{Measurement{T}}},range,Δ) where T    
+    p = Point2D(
+        range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ,
+        range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ
+    )
+    return p
 end
 
 # ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
@@ -488,53 +488,53 @@ f = similar(x0)
 
 # ╔═╡ e6e29d1e-9a93-49db-a358-6b66f0bc3433
 forces!(
-	f,
-	x0, 
-	(i,j,x,y) -> fₓ(x,y,cutoff) # closure
+    f,
+    x0, 
+    (i,j,x,y) -> fₓ(x,y,cutoff) # closure
 ) 
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
 trajectory = md((
-	x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff))
+    x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
+    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
+    mass = [ 1.0 for _ in 1:100 ],
+    dt = 0.1,
+    nsteps = 1000,
+    isave = 10,
+    forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff))
 )...)
 
 # ╔═╡ 985b4ffb-7964-4b50-8c2f-e5f45f352500
 trajectory_periodic = md((
-	x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
-	mass = [ 10.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
+    x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
+    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
+    mass = [ 10.0 for _ in 1:100 ],
+    dt = 0.1,
+    nsteps = 1000,
+    isave = 10,
+    forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
 @benchmark md($(
-	x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
+    x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
+    v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
+    mass = [ 1.0 for _ in 1:100 ],
+    dt = 0.1,
+    nsteps = 1000,
+    isave = 10,
+    forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
 trajectory_periodic_3D = md((
-	x0 = [random_point(Point3D{Float64},-50:50) for _ in 1:100 ], 
-	v0 = [random_point(Point3D{Float64},-1:1) for _ in 1:100 ], 
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
+    x0 = [random_point(Point3D{Float64},-50:50) for _ in 1:100 ], 
+    v0 = [random_point(Point3D{Float64},-1:1) for _ in 1:100 ], 
+    mass = [ 1.0 for _ in 1:100 ],
+    dt = 0.1,
+    nsteps = 1000,
+    isave = 10,
+    forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...)
 
 # ╔═╡ 4e97f24c-c237-4117-bc57-e4e88c8fb8d2
@@ -569,10 +569,10 @@ Perhaps this is more interesting to see in a planetary trajectory:
 
 # ╔═╡ 7b9bb0fd-34a5-42e1-bc35-7259447b73d0
 function gravitational_force(i,j,x,y,mass)
-	G = 0.00049823382528 # MKm³ / (10²⁴kg days²)
-	dr = y - x
-	r = norm(dr)
-	return G*mass[i]*mass[j]*dr/r^3
+    G = 0.00049823382528 # MKm³ / (10²⁴kg days²)
+    dr = y - x
+    r = norm(dr)
+    return G*mass[i]*mass[j]*dr/r^3
 end
 
 # ╔═╡ 6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
@@ -586,7 +586,7 @@ The uncertainty of the positions will be taken as the diameter of each planet. I
 
 # ╔═╡ c91862dd-498a-4712-8e3d-b77e088cd470
 planets_x0 = [
-	Point2D(  0.0 ±  1.39    , 0. ±  1.39    ), # "Sun"
+    Point2D(  0.0 ±  1.39    , 0. ±  1.39    ), # "Sun"
     Point2D( 57.9 ±  4.879e-3, 0. ±  4.879e-3), # "Mercury"
     Point2D(108.2 ± 12.104e-3, 0. ± 12.104e-3), # "Venus"
     Point2D(149.6 ± 12.756e-3, 0. ± 12.756e-3), # "Earth"
@@ -617,15 +617,15 @@ Let us see the planets orbiting the sun:
 
 # ╔═╡ aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
 trajectory_planets = md((
-	x0 = planets_x0, 
-	v0 = planets_v0, 
-	mass = masses,
-	dt = 1, # days
-	nsteps = 2*365, # two earth years
-	isave = 1, # save every day
-	forces! = (f,x) -> forces!(
-		f,x, (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
-	)
+    x0 = planets_x0, 
+    v0 = planets_v0, 
+    mass = masses,
+    dt = 1, # days
+    nsteps = 2*365, # two earth years
+    isave = 1, # save every day
+    forces! = (f,x) -> forces!(
+        f,x, (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+    )
 )...)
 
 # ╔═╡ 93697e4d-369b-48e9-8b28-a0ff58604d02
@@ -656,27 +656,27 @@ First, se define a function that executes a simulation of *one year* of an earth
 
 # ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
 function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
-	x0 = [
-		Point2D( zero(T), zero(T)), # "Sun"
-		Point2D(       x, zero(T))  # "Earth"
-	]
-	v0 = [ 
-		Point2D( zero(T), zero(T)), # "Sun"
-		Point2D( zero(T), 2.57*one(T)), # "Earth"
-	]
-	masses = [ 1.99e6, 5.97 ]
-	trajectory = md((
-		x0 = x0, 
-		v0 = v0, 
-		mass = masses,
-		dt = 1, # days
-		nsteps = nsteps, # one earth year
-		isave = isave, # save only last point
-		forces! = (f,x) -> forces!(f,x, 
-			(i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
-		)
-	)...)
-	return trajectory
+    x0 = [
+        Point2D( zero(T), zero(T)), # "Sun"
+        Point2D(       x, zero(T))  # "Earth"
+    ]
+    v0 = [ 
+        Point2D( zero(T), zero(T)), # "Sun"
+        Point2D( zero(T), 2.57*one(T)), # "Earth"
+    ]
+    masses = [ 1.99e6, 5.97 ]
+    trajectory = md((
+        x0 = x0, 
+        v0 = v0, 
+        mass = masses,
+        dt = 1, # days
+        nsteps = nsteps, # one earth year
+        isave = isave, # save only last point
+        forces! = (f,x) -> forces!(f,x, 
+            (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
+        )
+    )...)
+    return trajectory
 end
 
 # ╔═╡ 3ae783ce-d06e-4cc2-b8a3-94512e8f1490
@@ -686,8 +686,8 @@ Now we define our objective function, consisting of the norm of the difference b
 
 # ╔═╡ 13e7da81-8581-4f32-9fdb-2599dd36a12c
 function error_in_orbit(x::T=149.6) where T
-	traj = earth_orbit(x,365,365) # Save one point only
-	return norm(traj[end][2]-[x,0.])
+    traj = earth_orbit(x,365,365) # Save one point only
+    return norm(traj[end][2]-[x,0.])
 end
 
 # ╔═╡ 4870b1f3-3134-4ddc-a59d-fa806b456a23
@@ -718,24 +718,24 @@ To minimize the error in the orbit we will write a simple stepest descent algori
 
 # ╔═╡ 535716e6-9c1c-4324-a4cd-b1214df3c01d
 function gradient_descent(x,f,g,tol,maxtrial)
-	itrial = 0
-	step = 1.0
+    itrial = 0
+    step = 1.0
     fx = f(x)
     gx = g(x)
-	while (abs(gx) > tol) && (itrial < maxtrial) && (step > 1e-10)
-		xtrial = x - gx*step
-		ftrial = f(xtrial)
-		if ftrial > fx
-			step = step / 2
-		else
+    while (abs(gx) > tol) && (itrial < maxtrial) && (step > 1e-10)
+        xtrial = x - gx*step
+        ftrial = f(xtrial)
+        if ftrial > fx
+            step = step / 2
+        else
             x = xtrial
             fx = ftrial
-			gx = g(x)
-			step = step * 2
-		end
-		itrial += 1
-	end 
-	return x, gx, itrial
+            gx = g(x)
+            step = step * 2
+        end
+        itrial += 1
+    end 
+    return x, gx, itrial
 end
 
 # ╔═╡ b8edfb4e-6780-4ce7-94c1-4073ff7fa832
@@ -827,13 +827,13 @@ x0_large = [ Point2D(box_side*rand(),box_side*rand()) for _ in 1:n_large ]
 
 # ╔═╡ 29dbc47b-3697-4fdf-8f34-890ab4d0cdae
 t_naive = @elapsed trajectory_periodic_large = md((
-	x0 = x0_large, 
-	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
-	mass = [ 10.0 for _ in 1:n_large ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,box_side))
+    x0 = x0_large, 
+    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
+    mass = [ 10.0 for _ in 1:n_large ],
+    dt = 0.1,
+    nsteps = 1000,
+    isave = 10,
+    forces! = (f,x) -> forces!(f,x,(i,j,p1,p2) -> fₓ(p1,p2,cutoff,box_side))
 )...)
 
 # ╔═╡ 0ee7fc18-f41f-4179-a75e-1e1d56b2db29
@@ -853,9 +853,9 @@ In cell lists, the particles are classified in cells before any distance computa
 
 # ╔═╡ 5be87c6f-5c31-4d14-a8cb-4e63ef39d538
 begin
-	
+    
 function cell_list_picture()
-	
+    
 function square(c,side)
   x = [ c[1]-side/2, c[1]+side/2, c[1]+side/2, c[1]-side/2, c[1]-side/2]  
   y = [ c[2]-side/2, c[2]-side/2, c[2]+side/2, c[2]+side/2, c[2]-side/2]
@@ -898,8 +898,8 @@ plot!(plt,size=(400,400),
       ylim=(1.3,8.7),yticks=:none,
       framestyle=:box,
       xlabel="x",ylabel="y",grid=false)
-	
-	return plt
+    
+    return plt
 end
 
 cell_list_picture()
@@ -928,12 +928,12 @@ Using `CellListMap.jl`, we need to provide only the function that has to be eval
 
 # ╔═╡ 91b5eac1-4799-4a72-ac6a-e2b117b787d5
 function fpair_cl(x,y,i,j,d2,f,box::Box)
-	Δv = y - x
-	d = sqrt(d2)
-	fₓ = (d - box.cutoff)*(Δv/d)
-	f[i] += fₓ
-	f[j] -= fₓ
-	return f
+    Δv = y - x
+    d = sqrt(d2)
+    fₓ = (d - box.cutoff)*(Δv/d)
+    f[i] += fₓ
+    f[j] -= fₓ
+    return f
 end
 
 # ╔═╡ 0f86ab3c-29aa-472b-8194-228c736ee940
@@ -943,13 +943,13 @@ The function that computes the forces in our simulation will, then, consist of a
 
 # ╔═╡ 0b8a2292-c0d6-44e4-b560-32d9d579a008
 function forces_cl!(f::Vector{T},x,box::Box,cl::CellList,fpair::F) where {T,F}
-	fill!(f,zero(T))
-	cl = UpdateCellList!(x,box,cl,parallel=false)
-	map_pairwise!(
-		(x,y,i,j,d2,f) -> fpair(x,y,i,j,d2,f,box),
-		f, box, cl, parallel=false
-	)
-	return f
+    fill!(f,zero(T))
+    cl = UpdateCellList!(x,box,cl,parallel=false)
+    map_pairwise!(
+        (x,y,i,j,d2,f) -> fpair(x,y,i,j,d2,f,box),
+        f, box, cl, parallel=false
+    )
+    return f
 end
 
 # ╔═╡ d6585cca-78bf-41d1-aea3-01d9831d76cb
@@ -959,13 +959,13 @@ With a proper definition of the function to compute forces, we can now run again
 
 # ╔═╡ 1b7b7d48-79d2-4317-9045-5b7e7bd073e5
 t_cell_lists = @elapsed trajectory_cell_lists = md((
-	x0 = x0_large, 
-	v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
-	mass = [ 10.0 for _ in 1:n_large ],
-	dt = 0.1,
-	nsteps = 1000,
-	isave = 10,
-	forces! = (f,x) -> forces_cl!(f,x,box,cl,fpair_cl)
+    x0 = x0_large, 
+    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
+    mass = [ 10.0 for _ in 1:n_large ],
+    dt = 0.1,
+    nsteps = 1000,
+    isave = 10,
+    forces! = (f,x) -> forces_cl!(f,x,box,cl,fpair_cl)
 )...)
 
 # ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
@@ -1008,9 +1008,9 @@ The function that computes the energy associated to one pair of particles is, th
 
 # ╔═╡ 755fae26-6db9-45a0-a60d-d0e9c063f8aa
 function ulj_pair(x,y,r2,u,ε,σ)
-	@fastpow u += ε*(σ^12/r2^6 - 2*σ^6/r2^3)
-	return u
-end	
+    @fastpow u += ε*(σ^12/r2^6 - 2*σ^6/r2^3)
+    return u
+end    
 
 # ╔═╡ 9a8d8012-ba54-4d9b-8c4c-fe6358508f2a
 md"""
@@ -1019,11 +1019,11 @@ And the function that computes the total energy is the mapping of that function 
 
 # ╔═╡ ffbeae5f-8aec-4473-a446-5b73bd911733
 function ulj(x,ε,σ,box::Box,cl::CellList)
-	cl = UpdateCellList!(x,box,cl,parallel=false)
-	u = map_pairwise!(
+    cl = UpdateCellList!(x,box,cl,parallel=false)
+    u = map_pairwise!(
         (x,y,i,j,d2,u) -> ulj_pair(x,y,d2,u,ε,σ),
         zero(eltype(σ)), box, cl,
-		parallel=false
+        parallel=false
     )
     return u
 end
@@ -1035,22 +1035,22 @@ and we implement the corresponding functions that updates the forces:
 
 # ╔═╡ 5f1054b8-2337-43c1-a086-26233e95d42b
 function flj_pair!(x,y,i,j,r2,f,ε,σ)
-	@fastpow ∂u∂x = 12*ε*(σ^12/r2^7 - σ^6/r2^4)*(y-x)
-	f[i] -= ∂u∂x
-	f[j] += ∂u∂x
-	return f
+    @fastpow ∂u∂x = 12*ε*(σ^12/r2^7 - σ^6/r2^4)*(y-x)
+    f[i] -= ∂u∂x
+    f[j] += ∂u∂x
+    return f
 end
 
 # ╔═╡ bd719619-bdd4-4c3c-8d66-1df0f210c595
 function flj!(f::Vector{T},x,ε,σ,box,cl) where T
-	cl = UpdateCellList!(x,box,cl,parallel=false)
-	fill!(f,zero(T))
-	map_pairwise!(
-		(x,y,i,j,d2,f) -> flj_pair!(x,y,i,j,d2,f,ε,σ),
-		f, box, cl, 
-		parallel=false
-	)
-	return f
+    cl = UpdateCellList!(x,box,cl,parallel=false)
+    fill!(f,zero(T))
+    map_pairwise!(
+        (x,y,i,j,d2,f) -> flj_pair!(x,y,i,j,d2,f,ε,σ),
+        f, box, cl, 
+        parallel=false
+    )
+    return f
 end
 
 # ╔═╡ f289955b-0239-4b8d-ba08-2edf0a7284c2
@@ -1143,11 +1143,11 @@ We previously defined the short-range forces in the `forces_cl` function, but we
 
 # ╔═╡ 16cdbc18-e846-4d0a-b7e6-87f07c0c52d9
 function u_pack(x,box::Box,cl::CellList)
-	cl = UpdateCellList!(x,box,cl,parallel=false)
-	u = map_pairwise!(
+    cl = UpdateCellList!(x,box,cl,parallel=false)
+    u = map_pairwise!(
         (x,y,i,j,d2,u) -> (sqrt(d2) - box.cutoff)^2, # objective function
         0., box, cl,
-		parallel=false
+        parallel=false
     )
     return u
 end
@@ -1215,97 +1215,97 @@ const build_plots = true
 
 # ╔═╡ 374f239b-6470-40ed-b068-a8ecaace4f09
 build_plots && begin
-	r = 0:0.1:1.2*cutoff
-	plot(layout=(1,2),size=(600,300))
-	plot!(r,energy.(0.,r,cutoff),xlabel="Distance",ylabel="Energy",subplot=1)
-	plot!(r,fₓ.(0.,r,cutoff),xlabel="Distance",ylabel="Force",subplot=2)
-end	
+    r = 0:0.1:1.2*cutoff
+    plot(layout=(1,2),size=(600,300))
+    plot!(r,energy.(0.,r,cutoff),xlabel="Distance",ylabel="Energy",subplot=1)
+    plot!(r,fₓ.(0.,r,cutoff),xlabel="Distance",ylabel="Force",subplot=2)
+end    
 
 # ╔═╡ 43e6b146-ee35-40f1-b540-3da22b9e1b1b
 build_plots && scatter([(x.x, x.y) for x in x0])
 
 # ╔═╡ 505ef5ab-f131-4ab3-a723-795b5eb5dc0f
 build_plots && @gif for (step,x) in pairs(trajectory)
-  	scatter([ (p.x,p.y) for p in x ], lims=(-250,250))
-	annotate!(130,-210,text("step: $step",plot_font,12,:left))
+      scatter([ (p.x,p.y) for p in x ], lims=(-250,250))
+    annotate!(130,-210,text("step: $step",plot_font,12,:left))
 end
 
 # ╔═╡ efc586a2-0946-4dc5-ab3a-3902a811f3ad
 build_plots && @gif for (step,x) in pairs(trajectory_periodic)
-  	scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
-	annotate!(25,-50,text("step: $step",plot_font,12,:left))
+      scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
+    annotate!(25,-50,text("step: $step",plot_font,12,:left))
 end
 
 # ╔═╡ 4a498c18-406f-4437-b378-aa9fdc75b919
 build_plots && @gif for x in trajectory_periodic_3D
-  	scatter([ wrap.((p.x,p.y,p.z),100) for p in x ], lims=(-60,60))
+      scatter([ wrap.((p.x,p.y,p.z),100) for p in x ], lims=(-60,60))
 end
 
 # ╔═╡ d87c22d1-d595-4d43-ab1c-f28d282a3485
 build_plots && ( trajectory_2D_error = md((
-	x0 = [random_point(Point2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
-	v0 = [random_point(Point2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
-	mass = [ 1.0 for _ in 1:100 ],
-	dt = 0.1,
-	nsteps = 100,
-	isave = 1,
-	forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
+    x0 = [random_point(Point2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
+    v0 = [random_point(Point2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
+    mass = [ 1.0 for _ in 1:100 ],
+    dt = 0.1,
+    nsteps = 100,
+    isave = 1,
+    forces! = (f,x) -> forces!(f,x, (i,j,p1,p2) -> fₓ(p1,p2,cutoff,side))
 )...) )
 
 # ╔═╡ bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
 build_plots && @gif for x in trajectory_2D_error
-  	positions = [ wrap.((p.x.val,p.y.val),100) for p in x ]
-	scatter(positions, lims=(-60,60))
+      positions = [ wrap.((p.x.val,p.y.val),100) for p in x ]
+    scatter(positions, lims=(-60,60))
 end
 
 # ╔═╡ e24ce081-e367-4feb-8a79-66b8654a0b3a
 build_plots && @gif for x in trajectory_2D_error
-	histogram(
-		[ p.x.err for p in x ],
-		xlabel="Uncertainty in x",ylabel="Number of points",
-		bins=0:1e-4:20e-4,ylims=[0,50]
-	)
+    histogram(
+        [ p.x.err for p in x ],
+        xlabel="Uncertainty in x",ylabel="Number of points",
+        bins=0:1e-4:20e-4,ylims=[0,50]
+    )
 end
 
 # ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
 build_plots && @gif for (step,x) in pairs(trajectory_planets)
-	c = [ :yellow, :grey, :brown, :blue, :red ]
-  	positions = [ (p.x.val,p.y.val) for p in x ]
-	xerr = [ p.x.err for p in x ]
-	yerr = [ p.y.err for p in x ] 
-	scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
-	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+    c = [ :yellow, :grey, :brown, :blue, :red ]
+      positions = [ (p.x.val,p.y.val) for p in x ]
+    xerr = [ p.x.err for p in x ]
+    yerr = [ p.y.err for p in x ] 
+    scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
+    annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
 # ╔═╡ 4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 build_plots && @gif for step in eachindex(earth_traj_best)
-	colors = [ :yellow, :blue ]
-  	positions0 = [ (p.x,p.y) for p in earth_traj_0[step] ] 
-	positions_best = [ (p.x,p.y) for p in earth_traj_best[step] ]
-	scatter(positions0,lims=[-250,250], color=colors, alpha=0.5)
-	scatter!(positions_best,lims=[-250,250], color=colors)
-	scatter!(
-		(earth_traj_best[1][2].x,earth_traj_best[1][2].y),
-		color=:white,alpha=0.5,
-		markersize=10
-	)
-	annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+    colors = [ :yellow, :blue ]
+      positions0 = [ (p.x,p.y) for p in earth_traj_0[step] ] 
+    positions_best = [ (p.x,p.y) for p in earth_traj_best[step] ]
+    scatter(positions0,lims=[-250,250], color=colors, alpha=0.5)
+    scatter!(positions_best,lims=[-250,250], color=colors)
+    scatter!(
+        (earth_traj_best[1][2].x,earth_traj_best[1][2].y),
+        color=:white,alpha=0.5,
+        markersize=10
+    )
+    annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
 end
 
 # ╔═╡ e5b557d7-0952-4409-ae4c-a0c8ce736e03
 build_plots && @gif for (step,x) in pairs(trajectory_periodic_large)
-  	scatter(
-		[ wrap.((p.x,p.y),box_side) for p in x ], 
-		lims=(-1.1*box_side/2,1.1*box_side/2)
-	)
+      scatter(
+        [ wrap.((p.x,p.y),box_side) for p in x ], 
+        lims=(-1.1*box_side/2,1.1*box_side/2)
+    )
 end
 
 # ╔═╡ 30d2f39e-5df2-4f38-8032-e5f8492ba335
 build_plots && @gif for (step,x) in pairs(trajectory_cell_lists)
-  	scatter(
-		[ wrap.((p.x,p.y),box_side) for p in x ], 
-		lims=(-1.1*box_side/2,1.1*box_side/2)
-	)
+      scatter(
+        [ wrap.((p.x,p.y),box_side) for p in x ], 
+        lims=(-1.1*box_side/2,1.1*box_side/2)
+    )
 end
 
 # ╔═╡ b4154fb7-e0b0-4211-8490-8a8fe47cd2da
@@ -1315,35 +1315,35 @@ md"""
 
 # ╔═╡ 8ac7b1bf-c958-4eb5-8376-f802b372e796
 function gradient_descent!(x::Vector{T},f,g!;tol=1e-3,maxtrial=500) where T
-	gnorm(x) = maximum(norm(v) for v in x)
-	itrial = 0
-	step = 1.0
+    gnorm(x) = maximum(norm(v) for v in x)
+    itrial = 0
+    step = 1.0
     xtrial = similar(x)
-	g = fill!(similar(x),zero(T))
+    g = fill!(similar(x),zero(T))
     fx = f(x)
     g = g!(g,x)
-	while (gnorm(g) > tol) && (itrial < maxtrial) && (step > 1e-10)
-		@. xtrial = x - step*g
-		ftrial = f(xtrial)  
-		@show itrial, step, fx, ftrial
-		if ftrial >= fx
-			step = step / 2
-		else
+    while (gnorm(g) > tol) && (itrial < maxtrial) && (step > 1e-10)
+        @. xtrial = x - step*g
+        ftrial = f(xtrial)  
+        @show itrial, step, fx, ftrial
+        if ftrial >= fx
+            step = step / 2
+        else
             x .= xtrial
             fx = ftrial
-			g = g!(g,x)
-			step = step * 2
-		end
-		itrial += 1
-	end 
-	return x
+            g = g!(g,x)
+            step = step * 2
+        end
+        itrial += 1
+    end 
+    return x
 end
 
 # ╔═╡ 357c6621-b2b8-4f30-ba41-ffc1ae6f031b
 t_min = @elapsed x_min = gradient_descent!(
-	copy(x0_Ne),
-	(x) -> ulj(x,ε,σ,box_Ne,cl_Ne),
-	(g,x) -> -flj!(g,x,ε,σ,box_Ne,cl_Ne)
+    copy(x0_Ne),
+    (x) -> ulj(x,ε,σ,box_Ne,cl_Ne),
+    (g,x) -> -flj!(g,x,ε,σ,box_Ne,cl_Ne)
 )
 
 # ╔═╡ 58eb5b4b-76ad-4f7a-b86b-0494a857dca1
@@ -1360,9 +1360,9 @@ Because of that [`Packmol`](http://m3g.iqm.unicamp.br/packmol) was introduced. W
 
 # ╔═╡ 224336e2-522c-44af-b9a1-307e2ffff0f9
 t_pack = @elapsed x_pack = gradient_descent!(
-	copy(x0_Ne),
-	(x) -> u_pack(x,box_pack,cl_pack),
-	(g,x) -> -forces_cl!(g,x,box_pack,cl_pack,fpair_cl)
+    copy(x0_Ne),
+    (x) -> u_pack(x,box_pack,cl_pack),
+    (g,x) -> -forces_cl!(g,x,box_pack,cl_pack,fpair_cl)
 )
 
 # ╔═╡ 06526edf-911a-4ecc-a350-6d932ca56cd5
@@ -1378,20 +1378,21 @@ ulj(x_pack,ε,σ,box_Ne,cl_Ne)
 
 # ╔═╡ 339487cd-8ee8-4d1d-984b-b4c5ff00bae3
 t_Ne = @elapsed trajectory_Ne = md((
-	x0 = x_pack, 
-	v0 = [random_point(Point3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
-	mass = [ 20.179 for _ in 1:n_Ne ],
-	dt = 0.01,
-	nsteps = 100,
-	isave = 10,
-	forces! = (f,x) -> flj!(f,x,ε,σ,box_Ne,cl_Ne)
+    x0 = x_pack, 
+    v0 = [random_point(Point3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
+    mass = [ 20.179 for _ in 1:n_Ne ],
+    dt = 0.01,
+    nsteps = 100,
+    isave = 10,
+    forces! = (f,x) -> flj!(f,x,ε,σ,box_Ne,cl_Ne)
 )...)
 
 # ╔═╡ 9cb29b01-7f49-4145-96d8-c8fd971fe1c8
 build_plots && @gif for x in trajectory_Ne
-  	scatter(
-		[ wrap.((p.x,p.y,p.z),box_side_Ne) for p in x ], 
-		lims=(-1.1*box_side_Ne/2,1.1*box_side_Ne/2))
+    scatter(
+      [ wrap.((p.x,p.y,p.z),box_side_Ne) for p in x ], 
+      lims=(-1.1*box_side_Ne/2,1.1*box_side_Ne/2)
+    )
 end
 
 # ╔═╡ ac52a71b-1138-4f1b-99c3-c174d9f09187
