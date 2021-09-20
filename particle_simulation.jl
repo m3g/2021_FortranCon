@@ -59,8 +59,6 @@ Institute of Chemistry - University of Campinas
 md"""
 # Outline
 
-## Topics covered
-
 - Elements of a particle simulation
 - Benchmarking vs. a compiled language (Fortran)
 - Exploring the generic character of functions
