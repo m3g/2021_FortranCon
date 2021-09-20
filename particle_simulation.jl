@@ -19,6 +19,9 @@ using ForwardDiff
 # ╔═╡ d2f4d622-8e35-4be3-b421-39b28a748cab
 using CellListMap
 
+# ╔═╡ f049ab19-7ecf-4c65-bf6d-21352c1fe767
+using FastPow
+
 # ╔═╡ 7c792b6b-b6ee-4e30-88d5-d0b8064f2734
 begin
 	using Plots
@@ -168,7 +171,7 @@ Here we generate random positions and velocities, and use masses equal to `1.0` 
 
 # ╔═╡ eab7b195-64d5-4587-8687-48a673ab091b
 md"""
-# Using periodic boundary conditions
+## Using periodic boundary conditions
 
 Our particles just explode, since they have initial random velocities and there are only repulsive interactions. 
 
@@ -601,7 +604,7 @@ function gradient_descent(x,f,g,tol,maxtrial)
 	step = 1.0
     fx = f(x)
     gx = g(x)
-	while (abs(gx) > tol) && (itrial < maxtrial)
+	while (abs(gx) > tol) && (itrial < maxtrial) && (step > 1e-10)
 		xtrial = x - gx*step
 		ftrial = f(xtrial)
 		if ftrial > fx
@@ -639,6 +642,11 @@ md"""
 # Accelerating with CellListMap.jl
 """
 
+# ╔═╡ 53cedd26-3742-4c23-a8b8-8a1f2bdfa135
+md"""
+## The naive algorithm is too slow O(n²)
+"""
+
 # ╔═╡ fce1e3e0-cdf7-453f-b913-964c10fa85a6
 const n_large = 1000
 
@@ -669,11 +677,70 @@ md"""
 Running time of naive algorithm: $t_naive seconds
 """
 
+# ╔═╡ 0d0374ed-5150-40e6-b5a4-9a344b6ca47a
+md"""
+## Using cell lists
+"""
+
+# ╔═╡ 5be87c6f-5c31-4d14-a8cb-4e63ef39d538
+begin
+	
+function cell_list_picture()
+	
+function square(c,side)
+  x = [ c[1]-side/2, c[1]+side/2, c[1]+side/2, c[1]-side/2, c[1]-side/2]  
+  y = [ c[2]-side/2, c[2]-side/2, c[2]+side/2, c[2]+side/2, c[2]-side/2]
+  return x, y
+end
+
+plt = plot()
+
+x,y=square([5,5],2)
+plot!(plt,x,y,seriestype=[:shape],
+      linewidth=2,fillalpha=0.05,color="green",label="")
+
+x,y=square([5,5],6)
+plot!(plt,x,y,seriestype=[:shape],
+      linewidth=2,fillalpha=0.05,color="orange",label="")
+
+lines = collect(2:2:8)
+vline!(plt,lines,color="gray",label="",style=:dash)
+hline!(plt,lines,color="gray",label="",style=:dash)
+
+px = [ 0.1 + 9.8*rand() for i in 1:100 ]
+py = [ 0.1 + 9.8*rand() for i in 1:100 ]
+scatter!(plt,px,py,label="",alpha=0.20,color="blue")
+
+fontsize=8
+annotate!(plt,3,3,text("(i-1,j-1)",fontsize,:Courier))
+annotate!(plt,5,3,text("(i-1,j)",fontsize,:Courier))
+annotate!(plt,7,3,text("(i-1,j+1)",fontsize,:Courier))
+
+annotate!(plt,3,5,text("(i,j-1)",fontsize,:Courier))
+annotate!(plt,5,5,text("(i,j)",fontsize,:Courier))
+annotate!(plt,7,5,text("(i,j+1)",fontsize,:Courier))
+
+annotate!(plt,3,7,text("(i+1,j-1)",fontsize,:Courier))
+annotate!(plt,5,7,text("(i+1,j)",fontsize,:Courier))
+annotate!(plt,7,7,text("(i+1,j+1)",fontsize,:Courier))
+
+plot!(plt,size=(400,400), 
+      xlim=(1.3,8.7),xticks=:none,
+      ylim=(1.3,8.7),yticks=:none,
+      framestyle=:box,
+      xlabel="x",ylabel="y",grid=false)
+	
+	return plt
+end
+
+cell_list_picture()
+end
+
 # ╔═╡ 4fc5ef4d-e072-41f7-aef9-b42730c8313c
-const box = Box([box_side,box_side],cutoff)
+box = Box([box_side,box_side],cutoff)
 
 # ╔═╡ 7dcadd85-2986-4e42-aa84-67128a8f666d
-const cl = CellList(x0_large,box)
+cl = CellList(x0_large,box)
 
 # ╔═╡ 91b5eac1-4799-4a72-ac6a-e2b117b787d5
 function fpair_cl(x,y,i,j,d2,f,box::Box)
@@ -710,6 +777,207 @@ t_cell_lists = @elapsed trajectory_cell_lists = md((
 # ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
 md""" 
 Running time of CellListMap: $t_cell_lists seconds
+"""
+
+# ╔═╡ 76b8695e-64dc-44bc-8938-ce22c4a9e4d0
+md"""
+## Energy minimization: the Packmol strategy
+"""
+
+# ╔═╡ 372637ff-9305-4d45-bf6e-e6531dadbd14
+md"""
+### A Lennard-Jones potential energy
+
+Molecular dynamics simulations usually involve computing, for each pair of atoms, a Lennard-Jones function of the form:
+
+$$u(r) = \varepsilon\left(\frac{\sigma^{12}}{r^{12}} - 2\frac{\sigma^6}{r^6}\right)$$
+
+The high powers make the numerical behavior of this function quite undesirable. For example, let us try to minimize the energia a randomly generated set of points.
+
+We will define one function that adds to the energy the contribution of a given pair of particles, and then use the `map_pairwise!` function of `CellListMap.jl` to compute this function for all pairs closer than a cutoff.
+"""
+
+# ╔═╡ 3b2c08a6-b27e-49be-a0b0-e5cb3d5546e0
+md"""
+The `FastPow` package unrols the high powers that need to be computed into multiplications, squares and cubes, which are faster to compute (with some loss of precision which is of no concern here). This could be done by hand, but for code clarity and convenience, we opt to use the `@fastpow` macro.
+"""
+
+# ╔═╡ 755fae26-6db9-45a0-a60d-d0e9c063f8aa
+function ulj_pair(x,y,r2,u,ε,σ)
+	@fastpow u += ε*(σ^12/r2^6 - 2*σ^6/r2^3)
+	return u
+end	
+
+# ╔═╡ ffbeae5f-8aec-4473-a446-5b73bd911733
+function ulj(x,ε,σ,box::Box,cl::CellList)
+	cl = UpdateCellList!(x,box,cl,parallel=false)
+	u = map_pairwise!(
+        (x,y,i,j,d2,u) -> ulj_pair(x,y,d2,u,ε,σ),
+        zero(eltype(σ)), box, cl,
+		parallel=false
+    )
+    return u
+end
+
+# ╔═╡ 3738e40f-9596-469d-aa58-a4b28d8a22f8
+md"""
+and we implement the corresponding functions that updates the forces:
+"""
+
+# ╔═╡ 5f1054b8-2337-43c1-a086-26233e95d42b
+function flj_pair!(x,y,i,j,r2,f,ε,σ)
+	@fastpow ∂u∂x = 12*ε*(σ^12/r2^7 - σ^6/r2^4)*(y-x)
+	f[i] -= ∂u∂x
+	f[j] += ∂u∂x
+	return f
+end
+
+# ╔═╡ bd719619-bdd4-4c3c-8d66-1df0f210c595
+function flj!(f::Vector{T},x,ε,σ,box,cl) where T
+	cl = UpdateCellList!(x,box,cl,parallel=false)
+	fill!(f,zero(T))
+	map_pairwise!(
+		(x,y,i,j,d2,f) -> flj_pair!(x,y,i,j,d2,f,ε,σ),
+		f, box, cl, 
+		parallel=false
+	)
+	return f
+end
+
+# ╔═╡ f289955b-0239-4b8d-ba08-2edf0a7284c2
+md"""
+### A physical system: a Ne gas
+
+We will compute the energy of a Ne gas with 10k particles, with density $\sim 0.1$ particles/Å³, which is roughly the atomic density of liquid water. 
+
+The Lennard-Jones parameters for Neon are:
+"""
+
+# ╔═╡ 878ab5f7-28c1-4832-9c58-cb36b360766f
+const ε = 0.0441795 # kcal/mol
+
+# ╔═╡ a0dcd888-059d-4abe-bb6b-958d2879101c
+const σ = 2*1.64009 # Å
+
+# ╔═╡ b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
+md"""
+Number of particles and box side:
+"""
+
+# ╔═╡ cd1102ac-1500-4d79-be83-72ac9180c7ce
+const n_Ne = 10_000
+
+# ╔═╡ f21604f4-e4f7-4d43-b3d9-32f429df443e
+const box_side_Ne = (10_000/0.1)^(1/3)
+
+# ╔═╡ 59b1dbce-64af-4868-8c9d-23792c4a3a9f
+md"""
+Initial coordinates, box and cell lists. A typical cutoff for Lennard-Jones interactions in MD simulations is 12Å. 
+"""
+
+# ╔═╡ 10826a95-16f8-416d-b8c1-0ef3347c9b20
+x0_Ne = [random_point(Point3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
+
+# ╔═╡ 7c433791-a653-4836-91e2-084355c01d90
+const box_Ne = Box([box_side_Ne for _ in 1:3],12.)
+
+# ╔═╡ 410b9da4-7848-4385-bffc-a3d9bd03cf19
+const cl_Ne = CellList(x0_Ne,box_Ne)
+
+# ╔═╡ c08fff28-520e-40af-951c-fe3c324f67e0
+md"""
+### First, let us try to minimize the energy
+"""
+
+# ╔═╡ e3cc3c77-71ad-4006-8e27-fabaa1ae9cfb
+md"""
+The obtained energy (after 500 steps of stepest descent) is:
+"""
+
+# ╔═╡ 739c9a8a-13a5-4a33-a441-f5bc6cb35e82
+md"""
+### Packing the atoms
+"""
+
+# ╔═╡ 4e059cb8-6dac-450d-9f46-b3e657d9c3cf
+md"""
+To pack the atoms the "cutoff" needs to be of the order of the atom radii, instead of the cutoff of the Lennard-Jones interactions. Thus, we redefine the cell lists with a cutoff of σ. Since only very short-ranged interactions have to be computed, and the function is well behaved, the optimization is fast:
+"""
+
+# ╔═╡ 0f2f55f6-060b-475e-bef7-eaa99da4d99f
+box_pack = Box([box_side_Ne for _ in 1:3],σ)
+
+# ╔═╡ 415ad590-247b-4a5d-b21e-7af4d0c17493
+cl_pack = CellList(x0_Ne,box_pack)
+
+# ╔═╡ 53c2e16e-b7f5-4df2-96f4-08402b5f8979
+md"""
+We previously defined the short-range forces in the `forces_cl` function, but we didn't use the "energy" associated to it, which we will use now:
+"""
+
+# ╔═╡ 16cdbc18-e846-4d0a-b7e6-87f07c0c52d9
+function u_pack(x,box::Box,cl::CellList)
+	cl = UpdateCellList!(x,box,cl,parallel=false)
+	u = map_pairwise!(
+        (x,y,i,j,d2,u) -> (sqrt(d2) - box.cutoff)^2, # objective function
+        0., box, cl,
+		parallel=false
+    )
+    return u
+end
+
+# ╔═╡ b5e258cd-5542-4a4c-ae0f-91c2fee426db
+md"""
+Importantly, the result is a packing function which converged to a global minimizer (the resulting packing function value is zero):
+"""
+
+# ╔═╡ b0dc1c2b-82b7-488d-8074-1ef9f59a15e5
+md"""
+The energy, on the other side, is not necessarily small:
+"""
+
+# ╔═╡ 591e6a9c-444c-471f-a56b-4dfbc9111989
+md"""
+Even if the energy is high, we have the guarantee that no atoms are too close to each other, and this is an adequate configuration for a molecular dynamics simulation.
+
+`Packmol` solves this packing problem for molecules of complex shape, allowing the user to specify different geometrical constraints that define the arrangements of the atoms in the system.
+"""
+
+# ╔═╡ 1f265576-824a-4764-a738-685554068079
+md"""
+## How fast is CellListMap.jl?
+
+An idea of the efficiency of the cell list implementation in `CellListMap.jl` can be obtained by comparing the time required for an actual simulation of these Ne gas, compared to a stablished molecular dynamics simulation package, as NAMD. 
+
+We can run a simulation of this gas using the same functions we defined before, but with the actual potential energy:
+"""
+
+# ╔═╡ ac52a71b-1138-4f1b-99c3-c174d9f09187
+md"""
+This simulation took $t_Ne$ seconds. 
+
+Again, to understand exactly what that means, we need to perform a proper comparison. In [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/celllistmap_vs_namd) two simulations of the same gas, with proper thermodynamic conditions, are performed. The Julia algorithm implemented is similar to the present one, except that thermalization is done by velocity rescaling and the velocity-verlet algorithm is used for propagating the positions. The same algorthms are used in the equivalent NAMD simulations. The benchmark result is, for a 4-cores/8-threads execution in my Laptop:
+
+````
+NAMD:
+
+real    1m14,049s
+user    8m59,065s
+sys     0m1,130s
+
+CellListMap:
+
+real    1m21,054s
+user    7m38,053s
+sys     0m2,172s
+````
+
+This comparison of course can be questined: `NAMD` is a general purpose MD package designed for massive-parallel simulations, wnd `CellListMap.jl` is a package for computing any distance-dependent property, and for now designed and optimized on shared-memory computers. 
+
+Nevertheless,the benchmark shows that it is possible to write high-performant code in Julia, and that `CellListMap.jl` is a powerful tool for simulating or computing distance-dependent properties from the results of simulations.
+
+One of the applications of this package is the computation of distribution functions, in the [ComplexMixtures.jl](https://m3g.github.io/ComplexMixtures.jl/stable/)  package.
+
 """
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
@@ -830,6 +1098,92 @@ build_plots && @gif for (step,x) in pairs(trajectory_cell_lists)
 	)
 end
 
+# ╔═╡ b4154fb7-e0b0-4211-8490-8a8fe47cd2da
+md"""
+## Gradient descent for vectors
+"""
+
+# ╔═╡ 8ac7b1bf-c958-4eb5-8376-f802b372e796
+function gradient_descent!(x::Vector{T},f,g!;tol=1e-3,maxtrial=500) where T
+	gnorm(x) = maximum(norm(v) for v in x)
+	itrial = 0
+	step = 1.0
+    xtrial = similar(x)
+	g = fill!(similar(x),zero(T))
+    fx = f(x)
+    g = g!(g,x)
+	while (gnorm(g) > tol) && (itrial < maxtrial) && (step > 1e-10)
+		@. xtrial = x - step*g
+		ftrial = f(xtrial)  
+		@show itrial, step, fx, ftrial
+		if ftrial >= fx
+			step = step / 2
+		else
+            x .= xtrial
+            fx = ftrial
+			g = g!(g,x)
+			step = step * 2
+		end
+		itrial += 1
+	end 
+	return x
+end
+
+# ╔═╡ 357c6621-b2b8-4f30-ba41-ffc1ae6f031b
+t_min = @elapsed x_min = gradient_descent!(
+	copy(x0_Ne),
+	(x) -> ulj(x,ε,σ,box_Ne,cl_Ne),
+	(g,x) -> -flj!(g,x,ε,σ,box_Ne,cl_Ne)
+)
+
+# ╔═╡ 58eb5b4b-76ad-4f7a-b86b-0494a857dca1
+ulj(x_min,ε,σ,box_Ne,cl_Ne)
+
+# ╔═╡ 574047fa-6626-4cd0-8317-32118129711e
+md"""
+Here the example is only illustrative, but shows a common behavior: the energy after minimization is still too high. The cost and numerical instability of the true potential, at short distances, make it hard to minimize.
+
+**Time required for energy minimization: $t_min seconds**
+
+Because of that `Packmol` was introduced. We first solve the problem of packing the atoms in the space guaranteeing a minimum distance between the atoms. Here, this consists on the minimization of our simplified potential:
+"""
+
+# ╔═╡ 224336e2-522c-44af-b9a1-307e2ffff0f9
+t_pack = @elapsed x_pack = gradient_descent!(
+	copy(x0_Ne),
+	(x) -> u_pack(x,box_pack,cl_pack),
+	(g,x) -> -forces_cl!(g,x,box_pack,cl_pack,fpair_cl)
+)
+
+# ╔═╡ 06526edf-911a-4ecc-a350-6d932ca56cd5
+md"""
+**Time required for packing: $t_pack seconds**
+"""
+
+# ╔═╡ c48210e0-1a04-4f84-a4e2-f6b5d34a603d
+u_pack(x_pack,box_pack,cl_pack)
+
+# ╔═╡ 0471b987-f987-4656-b961-285e32d0a5e1
+ulj(x_pack,ε,σ,box_Ne,cl_Ne)
+
+# ╔═╡ 339487cd-8ee8-4d1d-984b-b4c5ff00bae3
+t_Ne = @elapsed trajectory_Ne = md((
+	x0 = x_pack, 
+	v0 = [random_point(Point3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
+	mass = [ 20.179 for _ in 1:n_Ne ],
+	dt = 0.01,
+	nsteps = 1000,
+	isave = 10,
+	forces! = (f,x) -> flj!(f,x,ε,σ,box_Ne,cl_Ne)
+)...)
+
+# ╔═╡ 9cb29b01-7f49-4145-96d8-c8fd971fe1c8
+build_plots && @gif for x in trajectory_Ne
+  	scatter(
+		[ wrap.((p.x,p.y,p.z),box_side_Ne) for p in x ], 
+		lims=(-1.1*box_side_Ne/2,1.1*box_side_Ne/2))
+end
+
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
 ## Table of Contents
@@ -840,6 +1194,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CellListMap = "69e1c6dd-3888-40e6-b3c8-31ac5f578864"
+FastPow = "c0e83750-1142-43a8-81cf-6c956b72b4d1"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
@@ -851,6 +1206,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [compat]
 BenchmarkTools = "~1.1.4"
 CellListMap = "~0.5.18"
+FastPow = "~0.1.0"
 ForwardDiff = "~0.10.19"
 Measurements = "~2.6.0"
 Plots = "~1.21.3"
@@ -1032,6 +1388,11 @@ deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers",
 git-tree-sha1 = "d8a578692e3077ac998b50c0217dfd67f21d1e5f"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.0+0"
+
+[[FastPow]]
+git-tree-sha1 = "7d961335144dad74de0e1b3a9b60e4d114a78dc2"
+uuid = "c0e83750-1142-43a8-81cf-6c956b72b4d1"
+version = "0.1.0"
 
 [[FixedPointNumbers]]
 deps = ["Statistics"]
@@ -1888,21 +2249,65 @@ version = "0.9.1+5"
 # ╠═b0b81da4-6788-45c4-b618-188a02b5e09c
 # ╟─4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 # ╟─826693ff-9a9b-46b1-aeb3-767a5e6f9441
+# ╟─53cedd26-3742-4c23-a8b8-8a1f2bdfa135
 # ╠═fce1e3e0-cdf7-453f-b913-964c10fa85a6
 # ╠═542a9ef5-d9ee-49bd-9d31-61e28b80b5cb
 # ╠═7600c6dc-769e-4c77-8526-281a1bcec079
 # ╟─7cbc7036-562e-42c1-a15f-31eae3b50b87
 # ╠═29dbc47b-3697-4fdf-8f34-890ab4d0cdae
 # ╟─0ee7fc18-f41f-4179-a75e-1e1d56b2db29
-# ╠═e5b557d7-0952-4409-ae4c-a0c8ce736e03
+# ╟─e5b557d7-0952-4409-ae4c-a0c8ce736e03
+# ╟─0d0374ed-5150-40e6-b5a4-9a344b6ca47a
 # ╠═d2f4d622-8e35-4be3-b421-39b28a748cab
+# ╟─5be87c6f-5c31-4d14-a8cb-4e63ef39d538
 # ╠═4fc5ef4d-e072-41f7-aef9-b42730c8313c
 # ╠═7dcadd85-2986-4e42-aa84-67128a8f666d
 # ╠═91b5eac1-4799-4a72-ac6a-e2b117b787d5
 # ╠═0b8a2292-c0d6-44e4-b560-32d9d579a008
 # ╠═1b7b7d48-79d2-4317-9045-5b7e7bd073e5
 # ╟─3f9dad58-294c-405c-bfc4-67855bb1e825
-# ╠═30d2f39e-5df2-4f38-8032-e5f8492ba335
+# ╟─30d2f39e-5df2-4f38-8032-e5f8492ba335
+# ╟─76b8695e-64dc-44bc-8938-ce22c4a9e4d0
+# ╟─372637ff-9305-4d45-bf6e-e6531dadbd14
+# ╟─3b2c08a6-b27e-49be-a0b0-e5cb3d5546e0
+# ╠═f049ab19-7ecf-4c65-bf6d-21352c1fe767
+# ╠═755fae26-6db9-45a0-a60d-d0e9c063f8aa
+# ╠═ffbeae5f-8aec-4473-a446-5b73bd911733
+# ╟─3738e40f-9596-469d-aa58-a4b28d8a22f8
+# ╠═5f1054b8-2337-43c1-a086-26233e95d42b
+# ╠═bd719619-bdd4-4c3c-8d66-1df0f210c595
+# ╟─f289955b-0239-4b8d-ba08-2edf0a7284c2
+# ╠═878ab5f7-28c1-4832-9c58-cb36b360766f
+# ╠═a0dcd888-059d-4abe-bb6b-958d2879101c
+# ╟─b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
+# ╠═cd1102ac-1500-4d79-be83-72ac9180c7ce
+# ╠═f21604f4-e4f7-4d43-b3d9-32f429df443e
+# ╟─59b1dbce-64af-4868-8c9d-23792c4a3a9f
+# ╠═10826a95-16f8-416d-b8c1-0ef3347c9b20
+# ╠═7c433791-a653-4836-91e2-084355c01d90
+# ╠═410b9da4-7848-4385-bffc-a3d9bd03cf19
+# ╟─c08fff28-520e-40af-951c-fe3c324f67e0
+# ╠═357c6621-b2b8-4f30-ba41-ffc1ae6f031b
+# ╟─e3cc3c77-71ad-4006-8e27-fabaa1ae9cfb
+# ╠═58eb5b4b-76ad-4f7a-b86b-0494a857dca1
+# ╟─574047fa-6626-4cd0-8317-32118129711e
+# ╟─739c9a8a-13a5-4a33-a441-f5bc6cb35e82
+# ╟─4e059cb8-6dac-450d-9f46-b3e657d9c3cf
+# ╠═0f2f55f6-060b-475e-bef7-eaa99da4d99f
+# ╠═415ad590-247b-4a5d-b21e-7af4d0c17493
+# ╟─53c2e16e-b7f5-4df2-96f4-08402b5f8979
+# ╠═16cdbc18-e846-4d0a-b7e6-87f07c0c52d9
+# ╠═224336e2-522c-44af-b9a1-307e2ffff0f9
+# ╟─06526edf-911a-4ecc-a350-6d932ca56cd5
+# ╟─b5e258cd-5542-4a4c-ae0f-91c2fee426db
+# ╠═c48210e0-1a04-4f84-a4e2-f6b5d34a603d
+# ╟─b0dc1c2b-82b7-488d-8074-1ef9f59a15e5
+# ╠═0471b987-f987-4656-b961-285e32d0a5e1
+# ╟─591e6a9c-444c-471f-a56b-4dfbc9111989
+# ╟─1f265576-824a-4764-a738-685554068079
+# ╠═339487cd-8ee8-4d1d-984b-b4c5ff00bae3
+# ╠═9cb29b01-7f49-4145-96d8-c8fd971fe1c8
+# ╟─ac52a71b-1138-4f1b-99c3-c174d9f09187
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
 # ╠═7c792b6b-b6ee-4e30-88d5-d0b8064f2734
@@ -1910,6 +2315,8 @@ version = "0.9.1+5"
 # ╠═febe8c06-b3aa-4db1-a3ea-fdc2a81bdebd
 # ╟─260d5753-6cc2-4137-8a2c-8d8a47585ecf
 # ╠═a9981931-4cc9-4d16-a6d2-34b4071a84d7
+# ╟─b4154fb7-e0b0-4211-8490-8a8fe47cd2da
+# ╠═8ac7b1bf-c958-4eb5-8376-f802b372e796
 # ╟─b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 # ╠═a756dd18-fac6-4527-944e-c16d8cc4bf95
 # ╟─00000000-0000-0000-0000-000000000001
