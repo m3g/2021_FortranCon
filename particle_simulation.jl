@@ -785,24 +785,47 @@ md"""
 # Accelerating with CellListMap.jl
 """
 
+# ╔═╡ d231842d-9b7a-4711-b71b-5d54041ebc1f
+md"""
+[`CellListMap.jl`](https://m3g.github.io/CellListMap.jl/stable/) is package aiming an efficient implementation of [cell lists](https://en.wikipedia.org/wiki/Cell_lists). Cell lists are practical algorithm to reduce the cost of computing short-ranged distances between particles. The package provides a general interface to compute any distance-dependent property, as potential energies and forces, nearest-neighbour lists, distribution functions, etc. It accepts systems with general (triclinic) periodic boundary conditions, in two and three dimensions. 
+
+The most simple cell list algorithm is relatively simple. Many optimizations can be done, however, on the construction of the lists, on the handling of periodic conditions, minimization of the number of unnecessary distance computations, and the parallelization of the construction of the lists and the mapping of the property to be evaluated. 
+
+"""
+
 # ╔═╡ 53cedd26-3742-4c23-a8b8-8a1f2bdfa135
 md"""
 ## The naive algorithm is too slow O(n²)
 """
 
+# ╔═╡ 889f837d-2e26-4261-b276-5fd91efdda6a
+md"""
+With ~1k, particles, the number of pairs of particles is already of the order of hundreds of thousands. The naive O(n²) algorithm is already too slow. Typical simulations involve tenths of thousands to millions of particles.
+"""
+
+# ╔═╡ 670a01e3-82f8-4c7f-8577-852081d91ed7
+md"""
+Here, we will simulate 1000 particles to start:
+"""
+
 # ╔═╡ fce1e3e0-cdf7-453f-b913-964c10fa85a6
 const n_large = 1000
 
+# ╔═╡ 69a92ac6-833c-4605-b3d0-9400e4572886
+md"""
+Our previous system had 100 particles in a square of side 100. We will keep the density constant:
+"""
+
 # ╔═╡ 542a9ef5-d9ee-49bd-9d31-61e28b80b5cb
-const box_side = 316.2
+const box_side = sqrt(n_large / (100/100^2))
+
+# ╔═╡ 8bada25c-b586-42b4-851d-232ccca8a456
+md"""
+We only need to generate the coordinates and run:
+"""
 
 # ╔═╡ 7600c6dc-769e-4c77-8526-281a1bcec079
 x0_large = [ Point2D(box_side*rand(),box_side*rand()) for _ in 1:n_large ] 
-
-# ╔═╡ 7cbc7036-562e-42c1-a15f-31eae3b50b87
-md"""
-This is already too slow for running live. It takes ~30s in my computer:
-"""
 
 # ╔═╡ 29dbc47b-3697-4fdf-8f34-890ab4d0cdae
 t_naive = @elapsed trajectory_periodic_large = md((
@@ -823,6 +846,11 @@ Running time of naive algorithm: $t_naive seconds
 # ╔═╡ 0d0374ed-5150-40e6-b5a4-9a344b6ca47a
 md"""
 ## Using cell lists
+"""
+
+# ╔═╡ f7cf613e-be9d-4f62-a778-cc4375eb99df
+md"""
+In cell lists, the particles are classified in cells before any distance computation. The distances are computed only for particles of vicinal cells. If the side of the cells is much smaller than the side of the complete system, the number of computations is drastically reduced.
 """
 
 # ╔═╡ 5be87c6f-5c31-4d14-a8cb-4e63ef39d538
@@ -879,11 +907,26 @@ end
 cell_list_picture()
 end
 
+# ╔═╡ 0c07edd3-c0a1-4f72-a16a-74badb7a6123
+md"""
+Using `CellListMap.jl` we need to setup our system, by providing the data on the box properties and the cutoff of the interactions:
+"""
+
 # ╔═╡ 4fc5ef4d-e072-41f7-aef9-b42730c8313c
 box = Box([box_side,box_side],cutoff)
 
+# ╔═╡ 19c5cc9d-8304-4e36-a3ea-a1151f28f71d
+md"""
+The particles are then classified in the cells. Virtual (ghost) particles are created at the boundaries to handle peridic boundary conditions and avoid having to wrap coordinates during the pairwise computation stage:
+"""
+
 # ╔═╡ 7dcadd85-2986-4e42-aa84-67128a8f666d
 cl = CellList(x0_large,box)
+
+# ╔═╡ 0b5c6ede-bceb-499a-a9a8-3c6a75ed340a
+md"""
+Using `CellListMap.jl`, we need to provide only the function that has to be evaluated *if$ the particles are closer than the cutoff. This function will only be called in that case. Here, the function will update the force vector:
+"""
 
 # ╔═╡ 91b5eac1-4799-4a72-ac6a-e2b117b787d5
 function fpair_cl(x,y,i,j,d2,f,box::Box)
@@ -895,6 +938,11 @@ function fpair_cl(x,y,i,j,d2,f,box::Box)
 	return f
 end
 
+# ╔═╡ 0f86ab3c-29aa-472b-8194-228c736ee940
+md"""
+The function that computes the forces in our simulation will, then, consist of an update of the cell lists followed by a call to the `map_pairwise!` function of `CellListMap.jl`, which takes as arguments the function to be mapped (`fpair_cl` here), the initial value of the forces vector `f`, and the system properties. We run only the serial version in this example:
+"""
+
 # ╔═╡ 0b8a2292-c0d6-44e4-b560-32d9d579a008
 function forces_cl!(f::Vector{T},x,box::Box,cl::CellList,fpair::F) where {T,F}
 	fill!(f,zero(T))
@@ -905,6 +953,11 @@ function forces_cl!(f::Vector{T},x,box::Box,cl::CellList,fpair::F) where {T,F}
 	)
 	return f
 end
+
+# ╔═╡ d6585cca-78bf-41d1-aea3-01d9831d76cb
+md"""
+With a proper definition of the function to compute forces, we can now run again the simulation:
+"""
 
 # ╔═╡ 1b7b7d48-79d2-4317-9045-5b7e7bd073e5
 t_cell_lists = @elapsed trajectory_cell_lists = md((
@@ -920,6 +973,11 @@ t_cell_lists = @elapsed trajectory_cell_lists = md((
 # ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
 md""" 
 Running time of CellListMap: $t_cell_lists seconds
+"""
+
+# ╔═╡ 6d61b58f-b88f-48f4-8bdd-0bb1a8bc1c82
+md"""
+Even for a small system like this one, the speedup is significant (from ~10s to ~0.5s). 
 """
 
 # ╔═╡ 76b8695e-64dc-44bc-8938-ce22c4a9e4d0
@@ -2417,24 +2475,35 @@ version = "0.9.1+5"
 # ╟─47c205c3-ceae-4e12-9ade-753df1608deb
 # ╟─4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 # ╟─826693ff-9a9b-46b1-aeb3-767a5e6f9441
+# ╟─d231842d-9b7a-4711-b71b-5d54041ebc1f
 # ╟─53cedd26-3742-4c23-a8b8-8a1f2bdfa135
+# ╟─889f837d-2e26-4261-b276-5fd91efdda6a
+# ╟─670a01e3-82f8-4c7f-8577-852081d91ed7
 # ╠═fce1e3e0-cdf7-453f-b913-964c10fa85a6
+# ╟─69a92ac6-833c-4605-b3d0-9400e4572886
 # ╠═542a9ef5-d9ee-49bd-9d31-61e28b80b5cb
+# ╟─8bada25c-b586-42b4-851d-232ccca8a456
 # ╠═7600c6dc-769e-4c77-8526-281a1bcec079
-# ╟─7cbc7036-562e-42c1-a15f-31eae3b50b87
 # ╠═29dbc47b-3697-4fdf-8f34-890ab4d0cdae
 # ╟─0ee7fc18-f41f-4179-a75e-1e1d56b2db29
 # ╟─e5b557d7-0952-4409-ae4c-a0c8ce736e03
 # ╟─0d0374ed-5150-40e6-b5a4-9a344b6ca47a
 # ╠═d2f4d622-8e35-4be3-b421-39b28a748cab
+# ╟─f7cf613e-be9d-4f62-a778-cc4375eb99df
 # ╟─5be87c6f-5c31-4d14-a8cb-4e63ef39d538
+# ╟─0c07edd3-c0a1-4f72-a16a-74badb7a6123
 # ╠═4fc5ef4d-e072-41f7-aef9-b42730c8313c
+# ╟─19c5cc9d-8304-4e36-a3ea-a1151f28f71d
 # ╠═7dcadd85-2986-4e42-aa84-67128a8f666d
+# ╟─0b5c6ede-bceb-499a-a9a8-3c6a75ed340a
 # ╠═91b5eac1-4799-4a72-ac6a-e2b117b787d5
+# ╟─0f86ab3c-29aa-472b-8194-228c736ee940
 # ╠═0b8a2292-c0d6-44e4-b560-32d9d579a008
+# ╟─d6585cca-78bf-41d1-aea3-01d9831d76cb
 # ╠═1b7b7d48-79d2-4317-9045-5b7e7bd073e5
 # ╟─3f9dad58-294c-405c-bfc4-67855bb1e825
 # ╟─30d2f39e-5df2-4f38-8032-e5f8492ba335
+# ╟─6d61b58f-b88f-48f4-8bdd-0bb1a8bc1c82
 # ╟─76b8695e-64dc-44bc-8938-ce22c4a9e4d0
 # ╟─372637ff-9305-4d45-bf6e-e6531dadbd14
 # ╟─3b2c08a6-b27e-49be-a0b0-e5cb3d5546e0
