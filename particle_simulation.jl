@@ -357,7 +357,7 @@ function random_point(::Type{PointType},range) where PointType
     dim = length(PointType)
     T = eltype(PointType)
     p = PointType(
-           range[begin] + rand(T)*(range[end]-range[begin]) for _ in 1:dim
+        range[begin] + rand(T)*(range[end]-range[begin]) for _ in 1:dim
     )
     return p
 end
@@ -608,7 +608,7 @@ And the masses are given in units of $10^{24}$ kg:
 """
 
 # ╔═╡ 57141f7c-9261-4dc5-98e4-b136a15f86fc
- const masses = [ 1.99e6, 0.330, 4.87, 5.97, 0.642 ]
+const masses = [ 1.99e6, 0.330, 4.87, 5.97, 0.642 ]
 
 # ╔═╡ 055e32d7-073c-40db-a267-750636b9f786
 md"""
@@ -856,48 +856,54 @@ begin
     
 function cell_list_picture()
     
-function square(c,side)
-  x = [ c[1]-side/2, c[1]+side/2, c[1]+side/2, c[1]-side/2, c[1]-side/2]  
-  y = [ c[2]-side/2, c[2]-side/2, c[2]+side/2, c[2]+side/2, c[2]-side/2]
-  return x, y
-end
-
-plt = plot()
-
-x,y=square([5,5],2)
-plot!(plt,x,y,seriestype=[:shape],
-      linewidth=2,fillalpha=0.05,color="green",label="")
-
-x,y=square([5,5],6)
-plot!(plt,x,y,seriestype=[:shape],
-      linewidth=2,fillalpha=0.05,color="orange",label="")
-
-lines = collect(2:2:8)
-vline!(plt,lines,color="gray",label="",style=:dash)
-hline!(plt,lines,color="gray",label="",style=:dash)
-
-px = [ 0.1 + 9.8*rand() for i in 1:100 ]
-py = [ 0.1 + 9.8*rand() for i in 1:100 ]
-scatter!(plt,px,py,label="",alpha=0.20,color="blue")
-
-fontsize=8
-annotate!(plt,3,3,text("(i-1,j-1)",fontsize,:Courier))
-annotate!(plt,5,3,text("(i-1,j)",fontsize,:Courier))
-annotate!(plt,7,3,text("(i-1,j+1)",fontsize,:Courier))
-
-annotate!(plt,3,5,text("(i,j-1)",fontsize,:Courier))
-annotate!(plt,5,5,text("(i,j)",fontsize,:Courier))
-annotate!(plt,7,5,text("(i,j+1)",fontsize,:Courier))
-
-annotate!(plt,3,7,text("(i+1,j-1)",fontsize,:Courier))
-annotate!(plt,5,7,text("(i+1,j)",fontsize,:Courier))
-annotate!(plt,7,7,text("(i+1,j+1)",fontsize,:Courier))
-
-plot!(plt,size=(400,400), 
-      xlim=(1.3,8.7),xticks=:none,
-      ylim=(1.3,8.7),yticks=:none,
-      framestyle=:box,
-      xlabel="x",ylabel="y",grid=false)
+    function square(c,side)
+          x = [ c[1]-side/2, c[1]+side/2, c[1]+side/2, c[1]-side/2, c[1]-side/2]  
+          y = [ c[2]-side/2, c[2]-side/2, c[2]+side/2, c[2]+side/2, c[2]-side/2]
+          return x, y
+    end
+    
+    plt = plot()
+    
+    x,y=square([5,5],2)
+    plot!(
+        plt,x,y,seriestype=[:shape],
+        linewidth=2,fillalpha=0.05,color="green",label=""
+    )
+    
+    x,y=square([5,5],6)
+    plot!(
+        plt,x,y,seriestype=[:shape],
+          linewidth=2,fillalpha=0.05,color="orange",label=""
+    )
+    
+    lines = collect(2:2:8)
+    vline!(plt,lines,color="gray",label="",style=:dash)
+    hline!(plt,lines,color="gray",label="",style=:dash)
+    
+    px = [ 0.1 + 9.8*rand() for i in 1:100 ]
+    py = [ 0.1 + 9.8*rand() for i in 1:100 ]
+    scatter!(plt,px,py,label="",alpha=0.20,color="blue")
+    
+    fontsize=8
+    annotate!(plt,3,3,text("(i-1,j-1)",fontsize,:Courier))
+    annotate!(plt,5,3,text("(i-1,j)",fontsize,:Courier))
+    annotate!(plt,7,3,text("(i-1,j+1)",fontsize,:Courier))
+    
+    annotate!(plt,3,5,text("(i,j-1)",fontsize,:Courier))
+    annotate!(plt,5,5,text("(i,j)",fontsize,:Courier))
+    annotate!(plt,7,5,text("(i,j+1)",fontsize,:Courier))
+    
+    annotate!(plt,3,7,text("(i+1,j-1)",fontsize,:Courier))
+    annotate!(plt,5,7,text("(i+1,j)",fontsize,:Courier))
+    annotate!(plt,7,7,text("(i+1,j+1)",fontsize,:Courier))
+    
+    plot!(
+        plt,size=(400,400), 
+        xlim=(1.3,8.7),xticks=:none,
+        ylim=(1.3,8.7),yticks=:none,
+        framestyle=:box,
+        xlabel="x",ylabel="y",grid=false
+    )
     
     return plt
 end
@@ -1226,19 +1232,19 @@ build_plots && scatter([(x.x, x.y) for x in x0])
 
 # ╔═╡ 505ef5ab-f131-4ab3-a723-795b5eb5dc0f
 build_plots && @gif for (step,x) in pairs(trajectory)
-      scatter([ (p.x,p.y) for p in x ], lims=(-250,250))
+    scatter([ (p.x,p.y) for p in x ], lims=(-250,250))
     annotate!(130,-210,text("step: $step",plot_font,12,:left))
 end
 
 # ╔═╡ efc586a2-0946-4dc5-ab3a-3902a811f3ad
 build_plots && @gif for (step,x) in pairs(trajectory_periodic)
-      scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
+    scatter([ wrap.((p.x,p.y),100) for p in x ], lims=(-60,60))
     annotate!(25,-50,text("step: $step",plot_font,12,:left))
 end
 
 # ╔═╡ 4a498c18-406f-4437-b378-aa9fdc75b919
 build_plots && @gif for x in trajectory_periodic_3D
-      scatter([ wrap.((p.x,p.y,p.z),100) for p in x ], lims=(-60,60))
+    scatter([ wrap.((p.x,p.y,p.z),100) for p in x ], lims=(-60,60))
 end
 
 # ╔═╡ d87c22d1-d595-4d43-ab1c-f28d282a3485
@@ -1254,7 +1260,7 @@ build_plots && ( trajectory_2D_error = md((
 
 # ╔═╡ bf0a5303-f5ce-4711-b9ee-a12ce2d8a397
 build_plots && @gif for x in trajectory_2D_error
-      positions = [ wrap.((p.x.val,p.y.val),100) for p in x ]
+    positions = [ wrap.((p.x.val,p.y.val),100) for p in x ]
     scatter(positions, lims=(-60,60))
 end
 
@@ -1270,7 +1276,7 @@ end
 # ╔═╡ 1067527e-76b7-4331-b3ab-efd72fb99dfc
 build_plots && @gif for (step,x) in pairs(trajectory_planets)
     c = [ :yellow, :grey, :brown, :blue, :red ]
-      positions = [ (p.x.val,p.y.val) for p in x ]
+    positions = [ (p.x.val,p.y.val) for p in x ]
     xerr = [ p.x.err for p in x ]
     yerr = [ p.y.err for p in x ] 
     scatter(positions,lims=[-250,250], color=c, xerror=xerr, yerror=yerr)
@@ -1280,7 +1286,7 @@ end
 # ╔═╡ 4cef9cea-1e84-42b9-bff6-b9a8b3bfe8da
 build_plots && @gif for step in eachindex(earth_traj_best)
     colors = [ :yellow, :blue ]
-      positions0 = [ (p.x,p.y) for p in earth_traj_0[step] ] 
+    positions0 = [ (p.x,p.y) for p in earth_traj_0[step] ] 
     positions_best = [ (p.x,p.y) for p in earth_traj_best[step] ]
     scatter(positions0,lims=[-250,250], color=colors, alpha=0.5)
     scatter!(positions_best,lims=[-250,250], color=colors)
@@ -1294,7 +1300,7 @@ end
 
 # ╔═╡ e5b557d7-0952-4409-ae4c-a0c8ce736e03
 build_plots && @gif for (step,x) in pairs(trajectory_periodic_large)
-      scatter(
+    scatter(
         [ wrap.((p.x,p.y),box_side) for p in x ], 
         lims=(-1.1*box_side/2,1.1*box_side/2)
     )
@@ -1302,7 +1308,7 @@ end
 
 # ╔═╡ 30d2f39e-5df2-4f38-8032-e5f8492ba335
 build_plots && @gif for (step,x) in pairs(trajectory_cell_lists)
-      scatter(
+    scatter(
         [ wrap.((p.x,p.y),box_side) for p in x ], 
         lims=(-1.1*box_side/2,1.1*box_side/2)
     )
