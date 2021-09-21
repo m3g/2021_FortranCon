@@ -35,7 +35,7 @@ subroutine force_pair(ndim,fx,x,y,cutoff,side)
     if (d > cutoff) then
         fx = 0.0_dp
     else
-        fx = (d - cutoff)*(dv/d)
+        fx = 2*(d - cutoff)*(dv/d)
     end if
 end subroutine force_pair
 
