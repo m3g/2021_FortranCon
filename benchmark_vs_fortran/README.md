@@ -240,7 +240,7 @@ end subroutine md
 
 ### Main program
 
-Here the codes differ a little bit, because the generation of initial coordinates and velocities can be performed with comprehensions `[...]` in Julia, and in Fortran we use explicit loops over preallocated arrays. The difference in the data structure becomes apparent, as we use vectors of `Point2D` objects in Julia, and plain matrices in Fortran. The memory layout of these two structures is the same, but abstracting the type of object as done in Julia allows the code to be more generic in general. The `md` function in Julia is called with the expansion of a named tuple for additional clarity.  
+Here the codes differ a little bit, because the generation of initial coordinates and velocities can be performed with comprehensions `[...]` in Julia, and in Fortran we use explicit loops over preallocated arrays. The difference in the data structure becomes apparent, as we use vectors of `Vec2D` objects in Julia, and plain matrices in Fortran. The memory layout of these two structures is the same, but abstracting the type of object as done in Julia allows the code to be more generic in general. The `md` function in Julia is called with the expansion of a named tuple for additional clarity.  
 
 In Julia the use of the module variables is declared outside the function, while in Fortran the module is used inside the main program. Finally, the Julia ends with a call to the `main()` function.
 
@@ -258,8 +258,8 @@ function main()
     side = 100.
     nsteps = 200_000
     trajectory = md((
-        x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:n ], 
-        v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n ], 
+        x0 = [random_point(Vec2D{Float64},(-50,50)) for _ in 1:n ], 
+        v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:n ], 
         mass = [ 10.0 for _ in 1:100 ],
         dt = 0.001,
         nsteps = nsteps,
@@ -327,7 +327,7 @@ end program main
 
 ### Additional code
 
-In the Julia implementation we need to define the `Point2D` data structure, which is set as a subtype of the convenient `FieldVector` structure of the `StaticArrays` package, which allow all arithmetics to work out of the box for this type of point. We use also the `Printf` package to write the coordinates, and import the `norm`  function from `LinearAlgebra` (which is available by default in Julia), although writing a custom `norm` function would be trivial and equivalent. We also defined a custom function to generate random points, and the code ends with the explicit call to the main function with the desired number of steps. 
+In the Julia implementation we need to define the `Vec2D` data structure, which is set as a subtype of the convenient `FieldVector` structure of the `StaticArrays` package, which allow all arithmetics to work out of the box for this type of point. We use also the `Printf` package to write the coordinates, and import the `norm`  function from `LinearAlgebra` (which is available by default in Julia), although writing a custom `norm` function would be trivial and equivalent. We also defined a custom function to generate random points, and the code ends with the explicit call to the main function with the desired number of steps. 
 
 On the Fortran side we define the type of floats of the package explicitly. A simple function to return a random number was defined and a function to compute the norm of a vector of the desired dimension was required.
 
@@ -341,13 +341,13 @@ using StaticArrays
 using Printf
 using LinearAlgebra: norm
 
-struct Point2D{T} <: FieldVector{2,T}
+struct Vec2D{T} <: FieldVector{2,T}
     x::T
     y::T
 end
 
-function random_point(::Type{Point2D{T}},range) where T 
-    p = Point2D(
+function random_point(::Type{Vec2D{T}},range) where T 
+    p = Vec2D(
         range[begin] + rand(T)*(range[end]-range[begin]),
         range[begin] + rand(T)*(range[end]-range[begin])
     )

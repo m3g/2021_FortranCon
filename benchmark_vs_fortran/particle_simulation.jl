@@ -4,7 +4,7 @@ using StaticArrays
 using Printf
 using LinearAlgebra: norm
 
-export Point2D, random_point
+export Vec2D, random_point
 export md, force_pair, wrap
 
 function wrap(x,side)
@@ -63,13 +63,13 @@ function md(x0,v0,mass,dt,nsteps,isave,force_pair::F) where F
     return trajectory
 end
 
-struct Point2D{T} <: FieldVector{2,T}
+struct Vec2D{T} <: FieldVector{2,T}
     x::T
     y::T
 end
 
-function random_point(::Type{Point2D{T}},range) where T 
-    p = Point2D(
+function random_point(::Type{Vec2D{T}},range) where T 
+    p = Vec2D(
         range[begin] + rand(T)*(range[end]-range[begin]),
         range[begin] + rand(T)*(range[end]-range[begin])
     )
@@ -86,8 +86,8 @@ function main()
     side = 100.
     nsteps = 200_000
     trajectory = md((
-        x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:n ], 
-        v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n ], 
+        x0 = [random_point(Vec2D{Float64},(-50,50)) for _ in 1:n ], 
+        v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:n ], 
         mass = [ 10.0 for _ in 1:100 ],
         dt = 0.001,
         nsteps = nsteps,

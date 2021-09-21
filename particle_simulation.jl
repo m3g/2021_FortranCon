@@ -78,7 +78,7 @@ We define a simple point in 2D space, with coordinates `x` and `y`. The point wi
 """
 
 # ╔═╡ 8c444ee4-8c77-413a-bbeb-9e5ae2428876
-struct Point2D{T} <: FieldVector{2,T}
+struct Vec2D{T} <: FieldVector{2,T}
     x::T
     y::T
 end
@@ -300,7 +300,7 @@ Not much is needed to just run the simulation in three dimensions. We only need 
 """
 
 # ╔═╡ 26d5c6e9-a903-4792-a0e0-dec1a2e86a01
-struct Point3D{T} <: FieldVector{3,T}
+struct Vec3D{T} <: FieldVector{3,T}
     x::T
     y::T
     z::T
@@ -439,7 +439,7 @@ And we can also define a 2D (or 3D) point of values with uncertainties, without 
 """
 
 # ╔═╡ d32743c0-fc80-406f-83c5-4528e439589a
-x = Point2D(MyMeasurement(1.0,0.1),MyMeasurement(2.0,0.2))
+x = Vec2D(MyMeasurement(1.0,0.1),MyMeasurement(2.0,0.2))
 
 # ╔═╡ 98478246-5940-4828-a8f1-9c9fa990676d
 md"""
@@ -474,8 +474,8 @@ We need to redefine your initial random point generator only:
 """
 
 # ╔═╡ 05402cbd-78c6-4234-8680-c351c8c37778
-function random_point(::Type{Point2D{Measurement{T}}},range,Δ) where T    
-    p = Point2D(
+function random_point(::Type{Vec2D{Measurement{T}}},range,Δ) where T    
+    p = Vec2D(
         range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ,
         range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ
     )
@@ -483,7 +483,7 @@ function random_point(::Type{Point2D{Measurement{T}}},range,Δ) where T
 end
 
 # ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
-x0 = [ random_point(Point2D{Float64},(0,100)) for _ in 1:100] 
+x0 = [ random_point(Vec2D{Float64},(0,100)) for _ in 1:100] 
 
 # ╔═╡ d23b4a92-055e-4ed7-bd46-8a3c59312993
 f = similar(x0)
@@ -497,8 +497,8 @@ forces!(
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
 trajectory = md((
-    x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
-    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
+    x0 = [random_point(Vec2D{Float64},(-50,50)) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:100 ], 
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -508,8 +508,8 @@ trajectory = md((
 
 # ╔═╡ 985b4ffb-7964-4b50-8c2f-e5f45f352500
 trajectory_periodic = md((
-    x0 = [random_point(Point2D{Float64},(-50,50)) for _ in 1:100 ], 
-    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:100 ], 
+    x0 = [random_point(Vec2D{Float64},(-50,50)) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:100 ], 
     mass = [ 10.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -519,8 +519,8 @@ trajectory_periodic = md((
 
 # ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
 @benchmark md($(
-    x0 = [random_point(Point2D{Float64},-50:50) for _ in 1:100 ], 
-    v0 = [random_point(Point2D{Float64},-1:1) for _ in 1:100 ], 
+    x0 = [random_point(Vec2D{Float64},-50:50) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Float64},-1:1) for _ in 1:100 ], 
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -530,8 +530,8 @@ trajectory_periodic = md((
 
 # ╔═╡ 0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
 trajectory_periodic_3D = md((
-    x0 = [random_point(Point3D{Float64},-50:50) for _ in 1:100 ], 
-    v0 = [random_point(Point3D{Float64},-1:1) for _ in 1:100 ], 
+    x0 = [random_point(Vec3D{Float64},-50:50) for _ in 1:100 ], 
+    v0 = [random_point(Vec3D{Float64},-1:1) for _ in 1:100 ], 
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -545,7 +545,7 @@ Which generates random points carrying an initial uncertainty we defined:
 """
 
 # ╔═╡ b31da90d-7165-42de-b18d-90584affea03
-random_point(Point2D{Measurement{Float64}},(-50,50),1e-5)
+random_point(Vec2D{Measurement{Float64}},(-50,50),1e-5)
 
 # ╔═╡ 5f37640b-ffd9-4877-a78c-a699b2671919
 md"""
@@ -588,20 +588,20 @@ The uncertainty of the positions will be taken as the diameter of each planet. I
 
 # ╔═╡ c91862dd-498a-4712-8e3d-b77e088cd470
 planets_x0 = [
-    Point2D(  0.0 ±  1.39    , 0. ±  1.39    ), # "Sun"
-    Point2D( 57.9 ±  4.879e-3, 0. ±  4.879e-3), # "Mercury"
-    Point2D(108.2 ± 12.104e-3, 0. ± 12.104e-3), # "Venus"
-    Point2D(149.6 ± 12.756e-3, 0. ± 12.756e-3), # "Earth"
-    Point2D(227.9 ±  6.792e-3, 0. ±  6.792e-3), # "Mars"
+    Vec2D(  0.0 ±  1.39    , 0. ±  1.39    ), # "Sun"
+    Vec2D( 57.9 ±  4.879e-3, 0. ±  4.879e-3), # "Mercury"
+    Vec2D(108.2 ± 12.104e-3, 0. ± 12.104e-3), # "Venus"
+    Vec2D(149.6 ± 12.756e-3, 0. ± 12.756e-3), # "Earth"
+    Vec2D(227.9 ±  6.792e-3, 0. ±  6.792e-3), # "Mars"
 ]
 
 # ╔═╡ a08d6e6d-ddc4-40aa-b7c4-93ea03191415
 planets_v0 = [
-    Point2D(0. ± 0.,   0.0 ± 0.), # "Sun"
-    Point2D(0. ± 0.,  4.10 ± 0.), # "Mercury"
-    Point2D(0. ± 0.,  3.02 ± 0.), # "Venus"
-    Point2D(0. ± 0.,  2.57 ± 0.), # "Earth"
-    Point2D(0. ± 0.,  2.08 ± 0.)  # "Mars"  
+    Vec2D(0. ± 0.,   0.0 ± 0.), # "Sun"
+    Vec2D(0. ± 0.,  4.10 ± 0.), # "Mercury"
+    Vec2D(0. ± 0.,  3.02 ± 0.), # "Venus"
+    Vec2D(0. ± 0.,  2.57 ± 0.), # "Earth"
+    Vec2D(0. ± 0.,  2.08 ± 0.)  # "Mars"  
 ]
 
 # ╔═╡ a356e2cc-1cb1-457a-986c-998cf1efe008
@@ -659,12 +659,12 @@ First, se define a function that executes a simulation of *one year* of an Earth
 # ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
 function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
     x0 = [
-        Point2D( zero(T), zero(T)), # "Sun"
-        Point2D(       x, zero(T))  # "Earth"
+        Vec2D( zero(T), zero(T)), # "Sun"
+        Vec2D(       x, zero(T))  # "Earth"
     ]
     v0 = [ 
-        Point2D( zero(T), zero(T)), # "Sun"
-        Point2D( zero(T), 2.57*one(T)), # "Earth"
+        Vec2D( zero(T), zero(T)), # "Sun"
+        Vec2D( zero(T), 2.57*one(T)), # "Earth"
     ]
     masses = [ 1.99e6, 5.97 ]
     trajectory = md((
@@ -825,12 +825,12 @@ We only need to generate the coordinates and run:
 """
 
 # ╔═╡ 7600c6dc-769e-4c77-8526-281a1bcec079
-x0_large = [ Point2D(box_side*rand(),box_side*rand()) for _ in 1:n_large ] 
+x0_large = [ Vec2D(box_side*rand(),box_side*rand()) for _ in 1:n_large ] 
 
 # ╔═╡ 29dbc47b-3697-4fdf-8f34-890ab4d0cdae
 t_naive = @elapsed trajectory_periodic_large = md((
     x0 = x0_large, 
-    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:n_large ], 
     mass = [ 10.0 for _ in 1:n_large ],
     dt = 0.1,
     nsteps = 1000,
@@ -968,7 +968,7 @@ With a proper definition of the function to compute forces, we can now run again
 # ╔═╡ 1b7b7d48-79d2-4317-9045-5b7e7bd073e5
 t_cell_lists = @elapsed trajectory_cell_lists = md((
     x0 = x0_large, 
-    v0 = [random_point(Point2D{Float64},(-1,1)) for _ in 1:n_large ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:n_large ], 
     mass = [ 10.0 for _ in 1:n_large ],
     dt = 0.1,
     nsteps = 1000,
@@ -1095,7 +1095,7 @@ Initial coordinates, box and cell lists. A typical cutoff for Lennard-Jones inte
 """
 
 # ╔═╡ 10826a95-16f8-416d-b8c1-0ef3347c9b20
-x0_Ne = [random_point(Point3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
+x0_Ne = [random_point(Vec3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
 
 # ╔═╡ c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 md"""
@@ -1251,8 +1251,8 @@ end
 
 # ╔═╡ d87c22d1-d595-4d43-ab1c-f28d282a3485
 build_plots && ( trajectory_2D_error = md((
-    x0 = [random_point(Point2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
-    v0 = [random_point(Point2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
+    x0 = [random_point(Vec2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 100,
@@ -1387,7 +1387,7 @@ ulj(x_pack,ε,σ,box_Ne,cl_Ne)
 # ╔═╡ 339487cd-8ee8-4d1d-984b-b4c5ff00bae3
 t_Ne = @elapsed trajectory_Ne = md((
     x0 = x_pack, 
-    v0 = [random_point(Point3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
+    v0 = [random_point(Vec3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
     mass = [ 20.179 for _ in 1:n_Ne ],
     dt = 0.01,
     nsteps = 100,
