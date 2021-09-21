@@ -67,6 +67,7 @@ md"""
 - An efficient and generic cell list implementation
 - The Packmol strategy
 - Benchmarking vs. NAMD
+- Remarks
 
 """
 
@@ -938,7 +939,7 @@ Using `CellListMap.jl`, we need to provide only the function that has to be eval
 function fpair_cl(x,y,i,j,d2,f,box::Box)
     Δv = y - x
     d = sqrt(d2)
-    fₓ = (d - box.cutoff)*(Δv/d)
+    fₓ = 2*(d - box.cutoff)*(Δv/d)
     f[i] += fₓ
     f[j] -= fₓ
     return f
@@ -978,12 +979,12 @@ t_cell_lists = @elapsed trajectory_cell_lists = md((
 
 # ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
 md""" 
-Running time of CellListMap: $t_cell_lists seconds (on the second run).
+Running time of CellListMap: $t_cell_lists seconds (on the second run - compilation takes about 2 seconds).
 """
 
 # ╔═╡ 6d61b58f-b88f-48f4-8bdd-0bb1a8bc1c82
 md"""
-Even for a small system like this one, the speedup is significant (from ~10s to ~0.5s). 
+Even for a small system like this one, the speedup is significant (of about $(round(Int,t_naive/t_cell_lists)) times here). 
 """
 
 # ╔═╡ 76b8695e-64dc-44bc-8938-ce22c4a9e4d0
@@ -1015,10 +1016,10 @@ The function that computes the energy associated to one pair of particles is, th
 """
 
 # ╔═╡ 755fae26-6db9-45a0-a60d-d0e9c063f8aa
-function ulj_pair(x,y,r2,u,ε,σ)
+function ulj_pair(r2,u,ε,σ)
     @fastpow u += ε*(σ^12/r2^6 - 2*σ^6/r2^3)
     return u
-end    
+end
 
 # ╔═╡ 9a8d8012-ba54-4d9b-8c4c-fe6358508f2a
 md"""
@@ -1029,7 +1030,7 @@ And the function that computes the total energy is the mapping of that function 
 function ulj(x,ε,σ,box::Box,cl::CellList)
     cl = UpdateCellList!(x,box,cl,parallel=false)
     u = map_pairwise!(
-        (x,y,i,j,d2,u) -> ulj_pair(x,y,d2,u,ε,σ),
+        (x,y,i,j,d2,u) -> ulj_pair(d2,u,ε,σ),
         zero(eltype(σ)), box, cl,
         parallel=false
     )
@@ -1130,7 +1131,7 @@ md"""
 
 # ╔═╡ 4e059cb8-6dac-450d-9f46-b3e657d9c3cf
 md"""
-To pack the atoms the "cutoff" needs to be of the order of the atom radii, instead of the cutoff of the Lennard-Jones interactions. Thus, we redefine the cell lists with a cutoff of σ. Since only very short-ranged interactions have to be computed, and the function is well behaved, the optimization is fast:
+To pack the atoms the "cutoff" needs to be of the order of the atom radii, instead of the cutoff of the Lennard-Jones interactions. Thus, we redefine the cell lists with a cutoff of σ/2. Since only very short-ranged interactions have to be computed, and the function is well behaved, the optimization is fast:
 """
 
 # ╔═╡ 5ff9c89a-d999-4af2-8e7e-fb99d4948c36
@@ -1139,7 +1140,7 @@ Let us initialize again the system, considering the smaller cutoff:
 """
 
 # ╔═╡ 0f2f55f6-060b-475e-bef7-eaa99da4d99f
-box_pack = Box([box_side_Ne for _ in 1:3],σ)
+box_pack = Box([box_side_Ne for _ in 1:3],σ/2)
 
 # ╔═╡ 415ad590-247b-4a5d-b21e-7af4d0c17493
 cl_pack = CellList(x0_Ne,box_pack)
@@ -1153,7 +1154,10 @@ We previously defined the short-range forces in the `forces_cl` function, but we
 function u_pack(x,box::Box,cl::CellList)
     cl = UpdateCellList!(x,box,cl,parallel=false)
     u = map_pairwise!(
-        (x,y,i,j,d2,u) -> (sqrt(d2) - box.cutoff)^2, # objective function
+        (x,y,i,j,d2,u) -> begin
+			u += (sqrt(d2) - box.cutoff)^2 # objective function
+			return u
+		end,
         0., box, cl,
         parallel=false
     )
@@ -1175,6 +1179,11 @@ md"""
 The energy, on the other side, is not necessarily small:
 """
 
+# ╔═╡ 97b8b15b-75c7-4321-999d-b067ed2a04f9
+md"""
+In two dimensions, this is the difference between a randomly generated set of coordinates, and a set obtained after solving the packing problem:
+"""
+
 # ╔═╡ 591e6a9c-444c-471f-a56b-4dfbc9111989
 md"""
 Even if the energy is high, we have the guarantee that no atoms are too close to each other, and this is an adequate configuration for a molecular dynamics simulation.
@@ -1189,6 +1198,18 @@ md"""
 An idea of the efficiency of the cell list implementation in `CellListMap.jl` can be obtained by comparing the time required for an actual simulation of these Ne gas, compared to a stablished molecular dynamics simulation package, as [NAMD](https://www.ks.uiuc.edu/Research/namd/). 
 
 We can run a simulation of this gas using the same functions we defined before, but with the actual potential energy:
+"""
+
+# ╔═╡ 1e099e1f-6494-419b-8517-5bded3e18aa6
+md"""
+# Remarks
+
+1. Many types of distributions of values, for instance, coordinates, can ben generated with the `Distributions.jl`  package. The generic character of the functions allow the functions to be used on custom types, as the `Vec2D` implemented here.
+
+2. The integrator of our `md` function is only the simplest one. The standard integrator for MD simulations is `Velocity-Verlet`, and is implemented in the code that compares the performance of `CellListMap.jl` and NAMD. Many other integration algorithms are implemented, for example, in the `DifferentialEquations.jl` package.
+
+3. The propagation of the uncertainty and the differentiability of particle simulations must be taken with a grain of salt. These systems are typically chaotic, thus uncertainties increase exponentialy, and derivatives are very unstable. An interesting blog post discussing the sensitivity of these calculations is [here](https://frankschae.github.io/post/shadowing/), and again the `DifferentialEquations.jl` package provides more adequate tools to deal with parameter optimization under such circunstances. 
+
 """
 
 # ╔═╡ 10c86547-d4f4-4c3f-8906-ac18ce93f3b6
@@ -1316,6 +1337,15 @@ build_plots && @gif for (step,x) in pairs(trajectory_cell_lists)
     )
 end
 
+# ╔═╡ 2634feff-7442-4d8f-b8e5-c11113136980
+build_plots && begin
+	r_lj = 2.8:0.05:8
+	plot(
+		r_lj,ulj_pair.(r_lj.^2,0.,ε,σ),
+		xlabel="Distance / Å", ylabel="Potential energy / kcal/mol"
+	)
+end
+
 # ╔═╡ b4154fb7-e0b0-4211-8490-8a8fe47cd2da
 md"""
 ## Gradient descent for vectors
@@ -1330,10 +1360,9 @@ function gradient_descent!(x::Vector{T},f,g!;tol=1e-3,maxtrial=500) where T
     g = fill!(similar(x),zero(T))
     fx = f(x)
     g = g!(g,x)
-    while (gnorm(g) > tol) && (itrial < maxtrial) && (step > 1e-10)
+    while (gnorm(g) > tol) && (itrial < maxtrial) 
         @. xtrial = x - step*g
         ftrial = f(xtrial)  
-        @show itrial, step, fx, ftrial
         if ftrial >= fx
             step = step / 2
         else
@@ -1342,7 +1371,8 @@ function gradient_descent!(x::Vector{T},f,g!;tol=1e-3,maxtrial=500) where T
             g = g!(g,x)
             step = step * 2
         end
-        itrial += 1
+        @show itrial, step, fx, ftrial, gnorm(g)
+		itrial += 1
     end 
     return x
 end
@@ -1436,6 +1466,44 @@ md"""
 ## Table of Contents
 """
 
+# ╔═╡ 555d1f62-b95b-4377-a8e2-9e442ee7526d
+
+
+# ╔═╡ f5510c1e-9b9f-49f0-bc7e-0fd8e79a5760
+md"""
+## 2D packing example
+"""
+
+# ╔═╡ 5d9a40b5-4050-47d2-9855-e9b62d56e8df
+side_test = 50
+
+# ╔═╡ 7f556f7c-cdb0-4f91-a359-2f933bbc5b68
+xtest = [ random_point(Vec2D{Float64},(-side_test,side_test)) for _ in 1:1000 ]
+
+# ╔═╡ 0fc843d2-ac4f-4717-a298-92a476223112
+tol_test = 2
+
+# ╔═╡ fc7f665b-00d9-431b-a97e-d2ff7253221a
+box_test = Box([side_test,side_test],tol_test)
+
+# ╔═╡ aadf6e48-0cbf-4973-86a1-173b6648d1df
+cl_test = CellList(xtest,box_test)
+
+# ╔═╡ 452e1ea7-98be-4910-ba6b-c0881fb251b2
+x_pack_test = gradient_descent!(
+    copy(xtest),
+    (x) -> u_pack(x,box_test,cl_test),
+    (g,x) -> -forces_cl!(g,x,box_test,cl_test,fpair_cl)
+)
+
+# ╔═╡ d9f254dc-ae4a-40b3-b682-f8a501e10a2d
+build_plots && begin
+	plot(layout=(1,2))
+	scatter!([ wrap.(Tuple(p),side_test) for p in xtest ],subplot=1)
+	scatter!([ wrap.(Tuple(p),side_test) for p in x_pack_test ],subplot=2)
+	plot!(lims=(-1.1*side_test/2,1.1*side_test/2),aspect_ratio=1,size=(800,400))
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -1451,13 +1519,13 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-BenchmarkTools = "~1.1.4"
-CellListMap = "~0.5.18"
+BenchmarkTools = "~1.2.0"
+CellListMap = "~0.5.19"
 FastPow = "~0.1.0"
 ForwardDiff = "~0.10.19"
 Measurements = "~2.6.0"
-Plots = "~1.21.3"
-PlutoUI = "~0.7.9"
+Plots = "~1.22.1"
+PlutoUI = "~0.7.10"
 StaticArrays = "~1.2.12"
 """
 
@@ -1481,10 +1549,10 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
 [[BenchmarkTools]]
-deps = ["JSON", "Logging", "Printf", "Statistics", "UUIDs"]
-git-tree-sha1 = "42ac5e523869a84eac9669eaceed9e4aa0e1587b"
+deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "61adeb0823084487000600ef8b1c00cc2474cd47"
 uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
-version = "1.1.4"
+version = "1.2.0"
 
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1506,15 +1574,15 @@ version = "0.5.1"
 
 [[CellListMap]]
 deps = ["DocStringExtensions", "LinearAlgebra", "Parameters", "ProgressMeter", "Random", "Setfield", "StaticArrays"]
-git-tree-sha1 = "31b252509c6865b3771d5b553c62b57439dc2b0c"
+git-tree-sha1 = "bb9ce9a37fbb004d8cdeee19d382439f77f74c81"
 uuid = "69e1c6dd-3888-40e6-b3c8-31ac5f578864"
-version = "0.5.18"
+version = "0.5.19"
 
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "4ce9393e871aca86cc457d9f66976c3da6902ea7"
+git-tree-sha1 = "bd4afa1fdeec0c8b89dad3c6e92bc6e3b0fec9ce"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.4.0"
+version = "1.6.0"
 
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random"]
@@ -1563,9 +1631,9 @@ uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.5.7"
 
 [[DataAPI]]
-git-tree-sha1 = "bec2532f8adb82005476c141ec23e921fc20971b"
+git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
-version = "1.8.0"
+version = "1.9.0"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -1594,9 +1662,9 @@ version = "1.0.3"
 
 [[DiffRules]]
 deps = ["NaNMath", "Random", "SpecialFunctions"]
-git-tree-sha1 = "3ed8fa7178a10d1cd0f1ca524f249ba6937490c0"
+git-tree-sha1 = "7220bc21c33e990c14f4a9a319b1d242ebc5b269"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
-version = "1.3.0"
+version = "1.3.1"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -1689,9 +1757,9 @@ version = "3.3.5+0"
 
 [[GR]]
 deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
-git-tree-sha1 = "182da592436e287758ded5be6e32c406de3a2e47"
+git-tree-sha1 = "c2178cfbc0a5a552e16d097fae508f2024de61a3"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.58.1"
+version = "0.59.0"
 
 [[GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
@@ -1739,6 +1807,11 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "8a954fed8ac097d5be04921d595f741115c1b2ad"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+0"
+
+[[HypertextLiteral]]
+git-tree-sha1 = "72053798e1be56026b81d4e2682dbe58922e5ec9"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.0"
 
 [[IniFile]]
 deps = ["Test"]
@@ -1974,9 +2047,9 @@ version = "8.44.0+0"
 
 [[Parameters]]
 deps = ["OrderedCollections", "UnPack"]
-git-tree-sha1 = "2276ac65f1e236e0a6ea70baff3f62ad4c625345"
+git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
 uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
-version = "0.12.2"
+version = "0.12.3"
 
 [[Parsers]]
 deps = ["Dates"]
@@ -2002,21 +2075,21 @@ version = "2.0.1"
 
 [[PlotUtils]]
 deps = ["ColorSchemes", "Colors", "Dates", "Printf", "Random", "Reexport", "Statistics"]
-git-tree-sha1 = "9ff1c70190c1c30aebca35dc489f7411b256cd23"
+git-tree-sha1 = "2537ed3c0ed5e03896927187f5f2ee6a4ab342db"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
-version = "1.0.13"
+version = "1.0.14"
 
 [[Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "GeometryBasics", "JSON", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "UUIDs"]
-git-tree-sha1 = "2dbafeadadcf7dadff20cd60046bba416b4912be"
+git-tree-sha1 = "4c2637482176b1c2fb99af4d83cb2ff0328fc33c"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.21.3"
+version = "1.22.1"
 
 [[PlutoUI]]
-deps = ["Base64", "Dates", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "Suppressor"]
-git-tree-sha1 = "44e225d5837e2a2345e69a1d1e01ac2443ff9fcb"
+deps = ["Base64", "Dates", "HypertextLiteral", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "Suppressor"]
+git-tree-sha1 = "26b4d16873562469a0a1e6ae41d90dec9e51286d"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-version = "0.7.9"
+version = "0.7.10"
 
 [[Preferences]]
 deps = ["TOML"]
@@ -2027,6 +2100,10 @@ version = "1.2.2"
 [[Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+
+[[Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 
 [[ProgressMeter]]
 deps = ["Distributed", "Printf"]
@@ -2055,9 +2132,9 @@ version = "1.1.2"
 
 [[RecipesPipeline]]
 deps = ["Dates", "NaNMath", "PlotUtils", "RecipesBase"]
-git-tree-sha1 = "d4491becdc53580c6dadb0f6249f90caae888554"
+git-tree-sha1 = "7ad0dfa8d03b7bcf8c597f59f5292801730c55b8"
 uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
-version = "0.4.0"
+version = "0.4.1"
 
 [[Reexport]]
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
@@ -2140,9 +2217,9 @@ version = "0.33.10"
 
 [[StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArrays", "Tables"]
-git-tree-sha1 = "f41020e84127781af49fc12b7e92becd7f5dd0ba"
+git-tree-sha1 = "2ce41e0d042c60ecd131e9fb7154a3bfadbf50d3"
 uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
-version = "0.6.2"
+version = "0.6.3"
 
 [[Suppressor]]
 git-tree-sha1 = "a819d77f31f83e5792a76081eee1ea6342ab8787"
@@ -2161,9 +2238,9 @@ version = "1.0.1"
 
 [[Tables]]
 deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "LinearAlgebra", "TableTraits", "Test"]
-git-tree-sha1 = "368d04a820fe069f9080ff1b432147a6203c3c89"
+git-tree-sha1 = "1162ce4a6c4b7e31e0e6b14486a6986951c73be9"
 uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
-version = "1.5.1"
+version = "1.5.2"
 
 [[Tar]]
 deps = ["ArgTools", "SHA"]
@@ -2564,6 +2641,7 @@ version = "0.9.1+5"
 # ╟─f289955b-0239-4b8d-ba08-2edf0a7284c2
 # ╠═878ab5f7-28c1-4832-9c58-cb36b360766f
 # ╠═a0dcd888-059d-4abe-bb6b-958d2879101c
+# ╟─2634feff-7442-4d8f-b8e5-c11113136980
 # ╟─b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
 # ╠═cd1102ac-1500-4d79-be83-72ac9180c7ce
 # ╠═f21604f4-e4f7-4d43-b3d9-32f429df443e
@@ -2592,11 +2670,14 @@ version = "0.9.1+5"
 # ╠═c48210e0-1a04-4f84-a4e2-f6b5d34a603d
 # ╟─b0dc1c2b-82b7-488d-8074-1ef9f59a15e5
 # ╠═0471b987-f987-4656-b961-285e32d0a5e1
+# ╟─97b8b15b-75c7-4321-999d-b067ed2a04f9
+# ╟─d9f254dc-ae4a-40b3-b682-f8a501e10a2d
 # ╟─591e6a9c-444c-471f-a56b-4dfbc9111989
 # ╟─1f265576-824a-4764-a738-685554068079
 # ╠═339487cd-8ee8-4d1d-984b-b4c5ff00bae3
 # ╟─9cb29b01-7f49-4145-96d8-c8fd971fe1c8
 # ╟─ac52a71b-1138-4f1b-99c3-c174d9f09187
+# ╟─1e099e1f-6494-419b-8517-5bded3e18aa6
 # ╟─10c86547-d4f4-4c3f-8906-ac18ce93f3b6
 # ╟─2871aca3-e6b4-4a2d-868a-36562e9a274c
 # ╟─2a2e9155-1c77-46fd-8502-8431573f94d0
@@ -2609,5 +2690,13 @@ version = "0.9.1+5"
 # ╠═8ac7b1bf-c958-4eb5-8376-f802b372e796
 # ╟─b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 # ╠═a756dd18-fac6-4527-944e-c16d8cc4bf95
+# ╠═555d1f62-b95b-4377-a8e2-9e442ee7526d
+# ╠═f5510c1e-9b9f-49f0-bc7e-0fd8e79a5760
+# ╠═7f556f7c-cdb0-4f91-a359-2f933bbc5b68
+# ╠═5d9a40b5-4050-47d2-9855-e9b62d56e8df
+# ╠═0fc843d2-ac4f-4717-a298-92a476223112
+# ╠═fc7f665b-00d9-431b-a97e-d2ff7253221a
+# ╠═aadf6e48-0cbf-4973-86a1-173b6648d1df
+# ╠═452e1ea7-98be-4910-ba6b-c0881fb251b2
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
