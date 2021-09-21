@@ -85,12 +85,12 @@ end
 
 # ╔═╡ a0de01b5-779a-48c0-8d61-12b02a5f527e
 md"""
-For convenience, here we will also define a function that returns a random point of tyis type, given a range of coordinates:
+For convenience, here we will also define a function that returns a random point, given a range of coordinates:
 """
 
 # ╔═╡ 532eb3bc-5522-4348-afa5-5336ec6752c7
 md"""
-In the function above we took care of making it generic for the type and dimension of the point desired, such that we do not need to redefine it later when peforming simulations with different point structures. 
+In defining the function above we took care of making it generic for the type and dimension of the point desired, such that we do not need to redefine it later when peforming simulations with different point structures. 
 """
 
 # ╔═╡ dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
@@ -99,18 +99,20 @@ md"""
 
 Initially, the energy function will be a soft potential, which is zero for distances greater than a cutoff, and increasing quadratically for distances smaller than the cutoff:
 
+If $d = ||\vec{y}-\vec{x}||$ is the norm of the relative position of two points, we have:
+
 $$u(\vec{x},\vec{y},c)=
 \begin{cases}
-(||\vec{y}-\vec{x}||-c)^2 &\textrm{if} & ||\vec{y}-\vec{x}||\leq c \\
-0 & \textrm{if} & ||\vec{y}-\vec{x}|| > c \\
+(d-c)^2 &\textrm{if} & d\leq c \\
+0 & \textrm{if} & d > c \\
 \end{cases}$$
 
 for which the forces are
 
 $$\vec{f_x}(\vec{x},\vec{y},c)=
 \begin{cases}
-2(||\vec{y}-\vec{x}||-c)\frac{(\vec{y}-\vec{x})}{||\vec{y}-\vec{x}||} &\textrm{if} & ||\vec{y}-\vec{x}||\leq c \\
-0 & \textrm{if} & ||\vec{y}-\vec{x}|| > c \\
+2(d-c)\frac{(\vec{y}-\vec{x})}{d} &\textrm{if} & d\leq c \\
+\vec{0} & \textrm{if} & d > c \\
 \end{cases}$$
 and
 $$\vec{f_y} = -\vec{f_x}$$.
@@ -621,7 +623,7 @@ trajectory_planets = md((
     v0 = planets_v0, 
     mass = masses,
     dt = 1, # days
-    nsteps = 2*365, # two earth years
+    nsteps = 2*365, # two Earth years
     isave = 1, # save every day
     forces! = (f,x) -> forces!(
         f,x, (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
@@ -635,7 +637,7 @@ If you are wandering why the errors oscilate, it is because the trajectories are
 
 # ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
 md"""
-One thing I don't like, though, is that in two years the earth did not complete two  revolutions around the sun. Something is wrong with our data. Can we improve that?
+One thing I don't like, though, is that in two years the Earth did not complete two  revolutions around the Sun. Something is wrong with our data. Can we improve that?
 """
 
 # ╔═╡ 827bda6f-87d4-4d36-8d89-f144f4595240
@@ -644,14 +646,14 @@ md"""
 
 Perhaps astoningshly (at least for me), our simulation is completely differentiable. That means that we can tune the parameters of the simulation, and the data, using optimization algorithms that require derivatives. 
 
-Here we speculate that what was wrong with our data was that the initial position of the earth was somewhat out of place. That caused the earth orbit to be slower than it should.
+Here we speculate that what was wrong with our data was that the initial position of the Earth was somewhat out of place. That caused the Earth orbit to be slower than it should.
 
-We will define, then, an objective function which returns the displacement of the earth relative to its initial position (at day one) after one year. Our goal is that after one year the earth returns to its initial position.
+We will define, then, an objective function which returns the displacement of the Earth relative to its initial position (at day one) after one year. Our goal is that after one year the Earth returns to its initial position.
 """
 
 # ╔═╡ 1ff4077a-4742-4c5e-a8d6-c4699469a683
 md"""
-First, se define a function that executes a simulation of *one year* of an earth orbit, starting from a given position for the earth `x` coordinate as a parameter. We will be careful in making all other coordinates of the same type of `x`, so that the generality of the type of variable being used is kept consistent:
+First, se define a function that executes a simulation of *one year* of an Earth orbit, starting from a given position for the Earth `x` coordinate as a parameter. We will be careful in making all other coordinates of the same type of `x`, so that the generality of the type of variable being used is kept consistent:
 """
 
 # ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
@@ -670,7 +672,7 @@ function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
         v0 = v0, 
         mass = masses,
         dt = 1, # days
-        nsteps = nsteps, # one earth year
+        nsteps = nsteps, # one Earth year
         isave = isave, # save only last point
         forces! = (f,x) -> forces!(f,x, 
             (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
@@ -681,7 +683,7 @@ end
 
 # ╔═╡ 3ae783ce-d06e-4cc2-b8a3-94512e8f1490
 md"""
-Now we define our objective function, consisting of the norm of the difference between the initial and final coordinates of the earth after one  year (what we want is that the earth returns to its initial position):
+Now we define our objective function, consisting of the norm of the difference between the initial and final coordinates of the Earth after one  year (what we want is that the Earth returns to its initial position):
 """
 
 # ╔═╡ 13e7da81-8581-4f32-9fdb-2599dd36a12c
@@ -976,7 +978,7 @@ t_cell_lists = @elapsed trajectory_cell_lists = md((
 
 # ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
 md""" 
-Running time of CellListMap: $t_cell_lists seconds
+Running time of CellListMap: $t_cell_lists seconds (on the second run).
 """
 
 # ╔═╡ 6d61b58f-b88f-48f4-8bdd-0bb1a8bc1c82
