@@ -60,7 +60,7 @@ md"""
 # Outline
 
 - Elements of a particle simulation
-- Benchmarking vs. a compiled language (Fortran)
+- Benchmarking vs. a conventional compiled language (Fortran)
 - Exploring the generic character of functions
 - Differentiable simulations and parameter fitting
 - Using cell lists
