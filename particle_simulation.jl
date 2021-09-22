@@ -658,7 +658,7 @@ First, se define a function that executes a simulation of *one year* of an Earth
 """
 
 # ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
-function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
+function earth_orbit(x::T=149.6,nsteps=2*3650,isave=20) where T
     x0 = [
         Vec2D( zero(T), zero(T)), # "Sun"
         Vec2D(       x, zero(T))  # "Earth"
@@ -672,9 +672,9 @@ function earth_orbit(x::T=149.6,nsteps=365,isave=1) where T
         x0 = x0, 
         v0 = v0, 
         mass = masses,
-        dt = 1, # days
+        dt = 0.1, # days
         nsteps = nsteps, # one Earth year
-        isave = isave, # save only last point
+        isave = isave, 
         forces! = (f,x) -> forces!(f,x, 
             (i,j,p1,p2) -> gravitational_force(i,j,p1,p2,masses)
         )
@@ -689,7 +689,8 @@ Now we define our objective function, consisting of the norm of the difference b
 
 # ╔═╡ 13e7da81-8581-4f32-9fdb-2599dd36a12c
 function error_in_orbit(x::T=149.6) where T
-    traj = earth_orbit(x,365,365) # Save one point only
+	nsteps = 2*3650
+    traj = earth_orbit(x,nsteps,nsteps) # Save last point only
     return norm(traj[end][2]-[x,0.])
 end
 
