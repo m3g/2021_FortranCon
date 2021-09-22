@@ -14,7 +14,7 @@ The main document here is the Pluto notebook file `particle_simulation.jl`, whic
 
 ### [Notebook: Particle simulations with Julia](https://m3g.github.io/2021_FortranCon/)
 
-Note: the page is about 30Mb-large and may take some time to completely load. Be pacient.
+Note: the page is about 30Mb-large and may take some time to completely load. Be patient.
 
 ##
 <p align=center>
