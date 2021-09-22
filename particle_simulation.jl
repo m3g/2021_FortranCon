@@ -1319,7 +1319,7 @@ build_plots && @gif for step in eachindex(earth_traj_best)
         markercolor=:white,alpha=0.5,
         markersize=10
     )
-    annotate!(150,-210,text(@sprintf("%5i days",step),plot_font,12))
+    annotate!(150,-210,text(@sprintf("%5i days",2*step),plot_font,12))
 end
 
 # ╔═╡ e5b557d7-0952-4409-ae4c-a0c8ce736e03
