@@ -21,7 +21,7 @@ using LinearAlgebra: norm_sqr
     print_traj::Int = 100
     trajfile::String = "ne10k_traj.xyz"
     cutoff::T = 12.
-    box::Box{UnitCellType,N,T,M} = Box([ 46.37, 46.37, 46.37 ], cutoff)
+    box::Box{UnitCellType,N,T,M} = Box([ 46.37, 46.37, 46.37 ], cutoff, lcell=2)
     # Parameters for Neon
     mass::T = 20.17900 # g/mol 
     ε::T = 0.0441795 # kcal/mol
