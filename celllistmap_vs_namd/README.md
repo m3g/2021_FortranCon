@@ -19,17 +19,19 @@ After installing NAMD, Julia, and the package dependencies (as explained below),
 
 The expected output is something like:
 ```
+% ./run.sh 
+
 NAMD:
 
-real    1m14,049s
-user    8m59,065s
-sys     0m1,130s
+real    1m18,081s
+user    9m31,554s
+sys     0m1,150s
 
 CellListMap:
 
-real    1m21,054s
-user    7m38,053s
-sys     0m2,172s
+real    1m4,829s
+user    6m28,151s
+sys     0m1,669s
 ```
 
 and two trajectory files will be created: `ne10k.dcd` by `NAMD`, and `ne10k_traj.xyz` by `simulate.jl`. These trajectories can be visualized with `vmd -e view_namd.vmd`  and `vmd -e view_julia.vmd`, and should look like some blue atoms shaking a little. 
