@@ -44,11 +44,11 @@ end
 
 # ╔═╡ a87fad48-73c1-4a08-a6f1-aae759b3c6fc
 md"""
-# Particle Simulations with Julia
+# Simulações de partículas em Julia
 
 Leandro Martínez
 
-Institute of Chemistry - University of Campinas
+Instituto de Química - Universidade de Campinas (UNICAMP)
 
 [http://m3g.iqm.unicamp.br](http://m3g.iqm.unicamp.br) - 
 [https://github.com/m3g](https://github.com/m3g)
@@ -57,25 +57,25 @@ Institute of Chemistry - University of Campinas
 
 # ╔═╡ 172227c2-b27a-40db-91f4-9566c2f6cf52
 md"""
-# Outline
+# Resumo
 
-- Elements of a particle simulation
-- Benchmarking vs. a conventional compiled language (Fortran)
-- Exploring the generic character of functions
-- Differentiable simulations and parameter fitting
+- Elementos de uma simulação de partículas
+- Performance vs. uma linguagem compilada convencional (Fortran)
+- Explorando o caráter genérico das funções
+- Simulações diferenciáveis e ajuste de parâmetros
 - Using cell lists
-- An efficient and generic cell list implementation
-- The Packmol strategy
-- Benchmarking vs. NAMD
-- Remarks
+- Uma implementação rápida e genérica das células ligadas
+- A estratégia do Packmol
+- Performance vs. NAMD
+- Notas
 
 """
 
 # ╔═╡ 4b484cf6-4888-4f04-b3fd-94862822b0c0
 md"""
-# Defining the type of particle
+# Definindo o tipo de partícula
 
-We define a simple vector in 2D space, with coordinates `x` and `y`. The vector will be defined with the aid of the `StaticArrays` package, which provides convenient constructors for this type of variable, and all the arithmetics. The memory layout of a vector of these vectors is identical to that of a `N×M` matrix, where `N` is the dimensio nf the space (2D here) and `M` is the number of vector. Julia is column-major, thus this is the most efficient memory layout for this type of computation.
+Definiremos, em princípio, um simples vetor em um espaço bidimensional, com coordenadas `x` e `y`.  O ponto será definido com a ajuda do pacote `StaticArrays`, que fornece uma interface conveniente para este tipo de variável, e sua aritmética. A estrutura na memória de vetores destes pontos é idêntica àquela de matrizes `N×M`, onde `Nl` é a dimensão do espaço (aqui 2D) e `Ml` é o número de pontos. Julia é "column-major", então este é o formato mais eficiente para este tipo de cálculo. 
 """
 
 # ╔═╡ 8c444ee4-8c77-413a-bbeb-9e5ae2428876
@@ -86,36 +86,37 @@ end
 
 # ╔═╡ a0de01b5-779a-48c0-8d61-12b02a5f527e
 md"""
-For convenience, here we will also define a function that returns a random vector, given a range of coordinates:
+Por conveniência, definiremos uma função simples que retorna um vetor aletório,
+dado o intervalo de coordenadas desejado:
 """
 
 # ╔═╡ 532eb3bc-5522-4348-afa5-5336ec6752c7
 md"""
-In defining the function above we took care of making it generic for the type and dimension of the vectors desired, such that we do not need to redefine it later when peforming simulations with different data structures. 
+Ao definir a função acima, tomamos o cuidado de escrever um código genérico para o tipo de varíavel e dimensão, de forma que não precisamos redefir esta função mais tarde, quando realizarmos simulações com diferentes tipo de estrutura de dados. 
 """
 
 # ╔═╡ dc5f7484-3dc3-47a7-ad4a-30f97fc14d11
 md"""
-## Force between a pair of particles 
+## Força entre um par de partículas
 
-Initially, the energy function will be a soft potential, which is zero for distances greater than a cutoff, and increasing quadratically for distances smaller than the cutoff:
+Inicialmente, a função de energia será um potencial suave, que é zero em distâncias maiores que um raio de corte, e cresce quadraticamente para distâncias menores que este raio.
 
-If $d = ||\vec{y}-\vec{x}||$ is the norm of the relative position of two positions, we have:
+Se $d = ||\vec{y}-\vec{x}||$ é o módulo da da posição relativa das duas partículas, temos o potencial:
 
 $$u(\vec{x},\vec{y},c)=
 \begin{cases}
-(d-c)^2 &\textrm{if} & d\leq c \\
-0 & \textrm{if} & d > c \\
+(d-c)^2 &\textrm{se} & d\leq c \\
+0 & \textrm{se} & d > c \\
 \end{cases}$$
 
-for which the forces are
+para o qual a força é:
 
 $$\vec{f_x}(\vec{x},\vec{y},c)=
 \begin{cases}
-2(d-c)\frac{(\vec{y}-\vec{x})}{d} &\textrm{if} & d\leq c \\
-\vec{0} & \textrm{if} & d > c \\
+2(d-c)\frac{(\vec{y}-\vec{x})}{d} &\textrm{se} & d\leq c \\
+\vec{0} & \textrm{se} & d > c \\
 \end{cases}$$
-and
+e
 $$\vec{f_y} = -\vec{f_x}$$.
 
 
@@ -123,7 +124,7 @@ $$\vec{f_y} = -\vec{f_x}$$.
 
 # ╔═╡ ab3ff21b-bf82-4d8c-abd1-c27418956ed8
 md"""
-The standard Julia `LinearAlgebra` library provides a `norm` function, and there is no reason not to use it (although a manual definition of the same function can also be easily implemented):
+O pacote padrão `LinearAlgegra` de Julia fornece uma função `norm`, e não há razão par não usá-la (ainda que uma versão manual é simples de escrever e tería performance similar):
 """
 
 # ╔═╡ 7a1db355-bba9-4322-9fb4-a6d7b7bdd60d
@@ -131,12 +132,12 @@ import LinearAlgebra: norm
 
 # ╔═╡ cc49ef04-08d8-42bb-9170-9db64e275a51
 md"""
-The energy and force functions are clear to read:
+As funções de energia e força são simples de entender:
 """
 
 # ╔═╡ d00e56f2-9d3a-4dd3-80eb-3201eff39b96
 md"""
-And for a unidimensional case, with a defined cutoff, look like:
+E, para o caso unidimensional, com um raio de corte definido, será:
 """
 
 # ╔═╡ b5c09cd3-6063-4a36-96cd-2d128aa11b82
@@ -144,44 +145,45 @@ const cutoff = 5.
 
 # ╔═╡ 7719b317-e85b-4583-b401-a8614d4b2373
 md"""
-The function that will compute the force over all pairs will just *naively* run over all (non-repeated) the pairs. The function `forces!` will receive as a parameter the function that computes the force between pairs, such that this pairwise function can be changed later. 
+A função que calcula a força sobre o pair de partículas correrá de forma ingênua sobre todos os pares de partículas não-repetidos. A função `forces!` vai receber os parâmetros necessários, de forma que poderemos modificar a função mais tarde. 
 
-Inside `forces!`, the `force_pair` function will receive four parameters: the indexes of the particles and their positions. We will use the indexes later. 
+Dentro da função `forces!`, a função `force_pair` vai receber quatro parâmetros: os índices das partículas e suas posições. Vamos usar os índices mais tarde. 
 """
 
 # ╔═╡ 144119ad-ab88-4165-883a-f2fc2464a838
 md"""
-Let us create some particle positions to explain how the function will be called. 
+Vamos criar alguns pontos para explicar como a função deve ser chamada.
 """
 
 # ╔═╡ dd9e4332-2908-40ef-b461-6b571df56cf4
 md"""
-The function `force_pair`, will be passed to the function that computes the forces to all pairs as *closure*, which will capture the value of the cutoff. The closure also allows us to ignore the indexes of the particles, which are expected by the inner implementation of the function inside `forces`. For example:
+A função `force_pair` será passada para a função que calcula as forças na forma de uma *closure* (função de fechamento?), que vai capturar o valor do raio de corte. A *closure* também permite que ignoremos os índices das partículas, que são parâmetros esperados pela implementação interna da função dentro de `forces!`. Por exemplo:
 """
 
 # ╔═╡ 017cd6a8-712d-4ec5-b31f-7f1f507764f2
 md"""
-The third argument of `forces!` function is a *closure*, which can be read as: it is the function that *given* `(i,j,x,y)`, returns `fₓ(x,y,cutoff)`. Thus, it is consistent with the internal call of `fₓ` of `forces!`, and *closes over* the additional parameter `cutoff` required for the computation. 
+O terceiro argumento de `forces!` é a *closure*, que pode ser lida como:
+esta é uma função que, dados `(i,j,x,y)` retorna o valor de `fₓ(x,y,cutoff)`. Então, ela é consistente com a chamada interna de `fₓ` em `forces!`, e "captura" (*closes over*) o parâmetro adicional `cutoff` que é requerido pelo cálculo. 
 """
 
 # ╔═╡ b5206dd5-1f46-4437-929b-efd68393b12b
 md"""
-# Performing a particle simulation
+# Realizando uma simulação de partículas
 
-Now, given the function that computes the forces, we can perform a particle simulation. We will use a simple Euler integration scheme, and the algorithm will be:
+Agora, dada a função que calcula as forças, podemos realizar uma simulação de partículas. Vamos usar um algoritmo simples de integração de Euler:
 
-1. Compute forces at time $t$ from positions $x$:
+1. Calcular as forças no tempo $t$ dadas as posições $x$:
 $f(t) = f(x)$
 
-2. Update the positions (using $a = f/m$):
+2. Atualizar as posições (usando $a = f/m$):
 $x(t + dt) = x(t) + v(t)dt + a(t)dt^2/2$
 
-3. Update the velocities:
+3. Atualizar as velocidades:
 $v(t+dt) = v(t) + a(t)dt$
 
-4. Goto 1.
+4. Voltar ao passo 1.
 
-## The actual simulation code is as short:
+## O código que realiza esta simulação é simples:
 """
 
 # ╔═╡ eb5dc224-1491-11ec-1cae-d51c93cd292c
@@ -215,45 +217,45 @@ end
 
 # ╔═╡ 594ba1d6-2dae-4f20-9546-f52fac17c2f0
 md"""
-By using a parametric type of input (i. e. `Vector{T}`) we can guarantee that an error will be thrown if the positions and velocities are not provided as the same type of variable. 
+Ao usar um tipo de variável paramétrico (i. e. `Vector{T}`) garantimos que teremos um erro se as posições e velocidades não possuem o mesmo tipo de elemento. 
 
-The `@.` notation is very common in Julia and means that the computation will be performed element-wise.
+A notação `@.` é muito comum em Julia, e significa que estamos fazendo um cálculo elemento por elemento, sendo apenas uma notação compacta para loops. 
 """
 
 # ╔═╡ 66c7d960-7e05-4613-84e8-2a40fe40dc3d
 md"""
-## Let us run the simulation!
+## Vamos rodar a simulação!
 """
 
 # ╔═╡ e717a8d9-ccfb-4f89-b2a2-f244f108b48d
 md"""
-Here we generate random positions and velocities, and use masses equal to `1.0` for all particles.
+Aqui geramos um conjunto aleatório de posições e velocidades, e vamos usar massas iguais a `1.0` para todas as partículas. 
 """
 
 # ╔═╡ eab7b195-64d5-4587-8687-48a673ab091b
 md"""
-## Using periodic boundary conditions
+## Usando condições periódicas de contorno
 
-Our particles just explode, since they have initial random velocities and there are only repulsive interactions. 
+Nossas partículas simplesmente explodem, já que as velocidades iniciais eram aleatórias e as partículas só interagem por potenciais repulsivos. 
 
-We have a more interesting dynamics if we use periodic boundary conditions. To do so, we will update how the forces are computed.
+Podemos obter uma dinâmica mais interessante se colocarmos condições periódicas de contorno. Para isso, vamos modificar a forma de calcular as forças. 
 """
 
 # ╔═╡ 34dc72dc-4864-47c0-b730-183f67e7aea3
 md"""
-## Wrapping of coordinates
+## Imagens mínimas 
 
-The following function defines how to wrap the coordinates on the boundaries, for a square or cubic box of side `side`:
+A função a seguir define como a imagem mínima relativa de duas partículas, de acordo com as condições periódicas de contorno, pode ser obtida (a operação se chama *wrap* em inglês), para uma caixa cúbica de lado `side`: 
 """
 
 # ╔═╡ 02d9bf3b-708c-4293-b198-9043b334ff7e
 md"""
-This allows writting the force computation now as:
+Isto permite que calculemos a força usando:
 """
 
 # ╔═╡ 0a5282ee-c88a-4bcc-aca2-477f28e9e04d
 md"""
-Our box has a side of 100:
+Noss caixa terá lado `100`:
 """
 
 # ╔═╡ b2a4a505-47ff-40bb-9a6d-a08d91c53217
@@ -261,43 +263,42 @@ const side = 100.
 
 # ╔═╡ fcff6973-012a-40fc-a618-f6262266287a
 md"""
-To run the simulation with the new periodic forces, we use the same `md` function, just passing the new `fₓ` function in the *closure* definition:
+Para executar a simulação com as novas forças periódicas, usaremos a mesma função `md`, apenas sendo necessário passar a nova função `fₓ` na definição de uma *closure*: 
 """
 
 # ╔═╡ 14867ffd-cde5-43f8-8399-01169ee29b73
 md"""
-A relevant detail here is that we could use the same `fₓ` name for the function, because it receives the `side` of the box as a parameter, and multiple-dispatch then chooses the correct method automaticaly. 
+Um detalhe relevante é que a função `fₓ` tem o mesmo nome. Como ela recebe o parâmetro `side` que não está presente na primeira definição da função, o múlitplo-despacho de Julia se encarregará de escolher o método correto. 
 """
 
 # ╔═╡ c4798182-de75-4b59-8be7-f7cf1051364d
 md"""
-While plotting the trajectory, we will wrap the coordinates:
+Ao fazer a animação da trajetória, estamos envolvendo as coordenadas nas condições periódicas (*wrapping*): 
 """
 
 # ╔═╡ 22fb0386-d4fa-47b9-ac31-decf2731cbc1
 md"""
-## Benchmarking
+## Performance
 """
 
 # ╔═╡ 8e23a3ea-3039-4a5f-b37f-c4710153938e
 md"""
-Benchmarkming in Julia can be done with the `@time` macro or the macros from the `BenchmarkTools` package. Compilation occurs on the first call to each method, and the macros from `BenchmarkTools` discount the compilation time automatically. 
+A perforamnance em Julia pode ser medida com a macro `@time` ou com as macros do pacote `BenchmarkTools`. A compilação das funções ocorre quando um método é chamado pela primeira vez, e `BenchmarkTools` vai automaticamente descontar o tempo de compilação e fazer uma amostragem estatisticamente mais relevante.
 """
 
 # ╔═╡ 2a3e7257-63ad-4761-beda-cec18b91f99c
 md"""
-
-Something of the order of `200ms` and `200KiB` of allocations does not seem bad, but it doesn't mean anything either. What is interesting to point here is just that this code, compared to ahead-of-time compiled language like Fortran, is completely comparable in terms of performance, as [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/benchmark_vs_fortran) shows. 
+Um tempo da ordem de `200ms` e alocações de `200kiB` não parecem ruins, mas também não significam nada isoladamente. O interessante é que este código é similar em performance a códigos em linguagens compiladas convencionais, como o Fortran, como mostra [este benchmark](https://github.com/m3g/2021_FortranCon/tree/main/benchmark_vs_fortran). 
 
 """
 
 # ╔═╡ 49b1f040-929a-4238-acd9-6554757b592c
 md"""
-# Exploring generics
+# Explorando implementações genéricas
 
-## Running the simulations in 3D
+## Rodando uma simulação em 3D
 
-Not much is needed to just run the simulation in three dimensions. We only need to define our 3D vector:
+Não precisamos fazer muito para rodar a simulação em três dimensões. Só é necessário definir nossos vetores em 3D:
 """
 
 # ╔═╡ 26d5c6e9-a903-4792-a0e0-dec1a2e86a01
@@ -309,16 +310,16 @@ end
 
 # ╔═╡ 2aef27bd-dea6-4a93-9d0f-b9249c9dd2cd
 md"""
-That is enough such that we can run the simulations in 3D:
+Com isto, podemos rodar nossa simulação em 3D:
 """
 
 # ╔═╡ b6dcb9a3-59e3-4eae-9399-fb072c704f1a
 md"""
-## Automatic error propagation
+## Propagação automática de erros 
 
-Performing simulations in different dimensions is not the most interesting, or most useful property of generic programming. We can, for example, propagate the error in the positions of the particles, simply by defining a type of particle that carries both the position and the cumulative error. 
+Realizer uma simulação com dimensão variável não é a aplicação mais interessante nem a mais útil da programação genérica. Podemos, por exemplo, propagar os erros nas posições das partículas, definindo um tipo de partícula que carrega consigo tanto a posição como sua incerteza acumulada. 
 
-A small example of how that can be done is shown. First, we create a type of variable that carries both the coordinates and the uncertainty on the coordinates:
+Um pequeno exemplo de como isto pode ser definido será mostrado aqui. Primeiro, criamos um tipo de variável que contém tanto a posição como sua incerteza:
 """
 
 # ╔═╡ e4657169-1bb2-4d4a-ac9d-adc80499d07d
@@ -329,7 +330,7 @@ end
 
 # ╔═╡ 5d395353-5681-4780-983e-902fdb89eaf2
 md"""
-and we will overload the printing of this variables to make things prettier:
+Vamos definir uma forma customizada de escrever esta variável na tela, para que fique mais bonita:
 """
 
 # ╔═╡ e9376a4b-3d60-42eb-8681-cd2bcec13fe8
@@ -340,7 +341,7 @@ m = MyMeasurement(1.0,0.1)
 
 # ╔═╡ a0993a1f-60a6-45b5-815e-676c49a9f049
 md"""
-Now we define the arithmetics for this type of variable. For example, the sum of two `MyMeasurement`s sums the uncertainties, but so do the subtraction. The other uncertainties are also propagaged linearly, according to the first derivative of their operations relative to the values:
+Agora, definimos a aritmética associada a esta variável. Por exemplo, a soma de duas variáveis do tipo `MyMeasurment` soma as incertezas. Mas a subtração delas também soma as incertezas. As outras incertezas são propagadas linearmente, de acordo com a primeira derivada da operação relativamente aos valores das variáveis:
 """
 
 # ╔═╡ 4e7f8db4-b5cc-4a3e-9fa7-e62d8f2a36ac
@@ -356,10 +357,10 @@ begin
 end
 
 # ╔═╡ f87e4036-8f82-41c7-90c1-daa5f677488d
-function random_vec(::Type{VecType},range) where VecType 
-    dim = length(VecType)
-    T = eltype(VecType)
-    p = VecType(
+function random_point(::Type{PointType},range) where PointType 
+    dim = length(PointType)
+    T = eltype(PointType)
+    p = PointType(
         range[begin] + rand(T)*(range[end]-range[begin]) for _ in 1:dim
     )
     return p
@@ -428,7 +429,7 @@ end
 
 # ╔═╡ 36da3e92-000c-4d4b-9abf-4cd588b3a354
 md"""
-With such definitions, we can operate over variables of type `MyMeasurement`, propagating automatically the uncertainty along the operations:
+Com estas definições, podemos aogra operar sobre estas variáveis do tipo `MyMeasurement` propagando as incertezas automaticamente:
 """
 
 # ╔═╡ 70eb2e0a-a5c8-4975-8f6c-589035bea29c
@@ -436,7 +437,7 @@ sqrt((2*(m + 4*m)^2/3))
 
 # ╔═╡ b4646a29-3efd-4bd1-bffc-3575559de937
 md"""
-We can also define a 2D (or 3D) vectors of values with uncertainties, without changing the previous definitions of these:
+E podemos também definir vetores 2D (ou 3D) com valores e incertezas, sem ser necessário modificar nossa definição de vetores:
 """
 
 # ╔═╡ d32743c0-fc80-406f-83c5-4528e439589a
@@ -444,7 +445,7 @@ x = Vec2D(MyMeasurement(1.0,0.1),MyMeasurement(2.0,0.2))
 
 # ╔═╡ 98478246-5940-4828-a8f1-9c9fa990676d
 md"""
-Now operations on this vector propagate the uncertainties of the componentes as well:
+As operações sobre estes vetores, agora, propagam as incertezas também:
 """
 
 # ╔═╡ 310f247e-3fe8-4621-ae0b-b5ee38d2ee89
@@ -452,11 +453,9 @@ Now operations on this vector propagate the uncertainties of the componentes as 
 
 # ╔═╡ 8267220a-f06e-4761-b310-00f8ba44e4b1
 md"""
-Propagating uncertainties in more general scenarios requires the definition of other propagation rules. Also, one might want to consider the correlation between variables, which makes the propagation rules more complicated and expensive.
+Prpagar as incertezas em cenários mais gerais requer a definição de outras regras de progração (de derivação). Ao mesmo tempo, queremos considerar a correlação entre as variáveis, o que faz das regras propagação mais complicadas e caras computacionalmente. 
 
-Fortunately, there are some package that provide the error propagation in more general scenarios, by defining the proper progagation rules. 
-
-Here, we use the `Measurements`  package.
+Felizmente, alguns pacotes foram criados para fazer esta propagação de erros em casos gerais. Aqui, usaremos o pacote `Measurements`: 
 """
 
 # ╔═╡ ce916139-221a-462e-877f-88212663c05e
@@ -466,16 +465,16 @@ md"""
 
 # ╔═╡ 8e2903be-4975-4e14-84ed-6e712f47fe47
 md"""
-Using `Measurments`  we do not need to change anything in our previous code, but only redefine the content of our vectors, which will now carry in each coordinate the position and the error in the position, accumulated from an initial uncertainty:
+Usando `Measurements` não precisamos modificar nada nos nossos códigos anteriores. Apenas precisamos redefinir o conteúdo de nossas posições e velocidades, que agoram carregarão as incertezas de cada coordenada:
 """
 
 # ╔═╡ 418f31bb-81d5-459b-b402-4fd4e3f4ab27
 md"""
-We need to redefine your initial random vector generator only:
+Vamos redefinir apenas o que signfica gerar coordenadas iniciais aleatórias, agora com incertezas:
 """
 
 # ╔═╡ 05402cbd-78c6-4234-8680-c351c8c37778
-function random_vec(::Type{Vec2D{Measurement{T}}},range,Δ) where T    
+function random_point(::Type{Vec2D{Measurement{T}}},range,Δ) where T    
     p = Vec2D(
         range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ,
         range[begin] + rand(T)*(range[end]-range[begin]) ± rand()*Δ
@@ -484,7 +483,7 @@ function random_vec(::Type{Vec2D{Measurement{T}}},range,Δ) where T
 end
 
 # ╔═╡ 356ac5a4-c94e-42cb-a085-0198b29c7e52
-x0 = [ random_vec(Vec2D{Float64},(0,100)) for _ in 1:100] 
+x0 = [ random_point(Vec2D{Float64},(0,100)) for _ in 1:100] 
 
 # ╔═╡ d23b4a92-055e-4ed7-bd46-8a3c59312993
 f = similar(x0)
@@ -498,8 +497,8 @@ forces!(
 
 # ╔═╡ 3755a4f3-1842-4de2-965e-d294c06c54c7
 trajectory = md((
-    x0 = [random_vec(Vec2D{Float64},(-50,50)) for _ in 1:100 ], 
-    v0 = [random_vec(Vec2D{Float64},(-1,1)) for _ in 1:100 ], 
+    x0 = [random_point(Vec2D{Float64},(-50,50)) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:100 ], 
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -509,8 +508,8 @@ trajectory = md((
 
 # ╔═╡ 985b4ffb-7964-4b50-8c2f-e5f45f352500
 trajectory_periodic = md((
-    x0 = [random_vec(Vec2D{Float64},(-50,50)) for _ in 1:100 ], 
-    v0 = [random_vec(Vec2D{Float64},(-1,1)) for _ in 1:100 ], 
+    x0 = [random_point(Vec2D{Float64},(-50,50)) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:100 ], 
     mass = [ 10.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -520,8 +519,8 @@ trajectory_periodic = md((
 
 # ╔═╡ 1ad401b5-20b2-489b-b2aa-92f729b1d725
 @benchmark md($(
-    x0 = [random_vec(Vec2D{Float64},-50:50) for _ in 1:100 ], 
-    v0 = [random_vec(Vec2D{Float64},-1:1) for _ in 1:100 ], 
+    x0 = [random_point(Vec2D{Float64},-50:50) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Float64},-1:1) for _ in 1:100 ], 
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -531,8 +530,8 @@ trajectory_periodic = md((
 
 # ╔═╡ 0546ee2d-b62d-4c7a-8172-ba87b3c1aea4
 trajectory_periodic_3D = md((
-    x0 = [random_vec(Vec3D{Float64},-50:50) for _ in 1:100 ], 
-    v0 = [random_vec(Vec3D{Float64},-1:1) for _ in 1:100 ], 
+    x0 = [random_point(Vec3D{Float64},-50:50) for _ in 1:100 ], 
+    v0 = [random_point(Vec3D{Float64},-1:1) for _ in 1:100 ], 
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 1000,
@@ -542,32 +541,32 @@ trajectory_periodic_3D = md((
 
 # ╔═╡ 4e97f24c-c237-4117-bc57-e4e88c8fb8d2
 md"""
-Which generates random positions carrying an initial uncertainty we defined:
+Which generates random points carrying an initial uncertainty we defined:
 """
 
 # ╔═╡ b31da90d-7165-42de-b18d-90584affea03
-random_vec(Vec2D{Measurement{Float64}},(-50,50),1e-5)
+random_point(Vec2D{Measurement{Float64}},(-50,50),1e-5)
 
 # ╔═╡ 5f37640b-ffd9-4877-a78c-a699b2671919
 md"""
-That given, the same simulation codes can be used to run the particles simulations while propagating the uncertinties of the coordinates of each position:
+Dadas estas novas coordenadas e velocidades, o mesmo código de simulação pod eser usado, mas agora propagando as incertezas automaticamente: 
 """
 
 # ╔═╡ 1d6eedfd-d013-4557-9cf2-103f8fb7b72a
 md"""
-The trajectory, of course, looks the same (except that we ran less steps, because propagating the error is expensive):
+A trajetória, claro, é a mesma (exceto que calculamos menos passos, porque propagar os erros é caro computacionalmente):
 """
 
 # ╔═╡ c003a61d-a434-4d7b-9214-5b52aa044248
 md"""
-But now we have an estimate of the error of the positions, propagated from the initial uncertainty:
+Mas temos, agora, uma estimativa do erro de cada posição, propagado ao longo do tempo desde a incerteza inicial nas medidas:
 """
 
 # ╔═╡ 63eb391f-0238-434a-bc3a-2fa8ed41448e
 md"""
-### Planetary motion
+### Movimento planetário
 
-Perhaps this is more interesting to see in a planetary trajectory:
+Esta propagação de incertezas é provavelmente mais interessante de ver em um movimento planetário:
 """
 
 # ╔═╡ 7b9bb0fd-34a5-42e1-bc35-7259447b73d0
@@ -580,11 +579,11 @@ end
 
 # ╔═╡ 6a4e0e2e-75c5-4cab-987d-3d6b62f9bb06
 md"""
-Note that now we need the indexes of the particles to be able to pass the information of their masses. 
+Note que agora precisamos dos índices das partículas na função, porque queremos passar também a informação sobre suas massas, que são diferentes. 
 
-A set of planetary positions and velocities is something that we have to obtain [experimentaly](https://nssdc.gsfc.nasa.gov/planetary/factsheet/). Here, the distance units $10^6$ km, and time is in days. Thus, velocities are in MKm per day.
+Um conjunto inicial de posições e velocidades de planetas é algo que precisamos obter [experimentalmente](https://nssdc.gsfc.nasa.gov/planetary/factsheet/). Aqui, a distância está mediad em $10^6$ km, e o tempo está medido em dias. Então, a velocidade está medida em MKm por dia. 
 
-The uncertainty of the positions will be taken as the diameter of each planet. In this illustrative example we will not add uncertainties to the velcities. 
+A incerteza inicial nas posições será tomada como o diâmetro de cada planeta. Neste exemplo não introduziremos incertezas sobre as velocidades. 
 """
 
 # ╔═╡ c91862dd-498a-4712-8e3d-b77e088cd470
@@ -607,7 +606,7 @@ planets_v0 = [
 
 # ╔═╡ a356e2cc-1cb1-457a-986c-998cf1efe008
 md"""
-And the masses are given in units of $10^{24}$ kg:
+As massas estão medidas em $10^{24}$ kg:
 """
 
 # ╔═╡ 57141f7c-9261-4dc5-98e4-b136a15f86fc
@@ -615,7 +614,7 @@ const masses = [ 1.99e6, 0.330, 4.87, 5.97, 0.642 ]
 
 # ╔═╡ 055e32d7-073c-40db-a267-750636b9f786
 md"""
-Let us see the planets orbiting the sun:
+Vamos ver os planetas orbitando o sol:
 """
 
 # ╔═╡ aaa97ce4-a5ff-4332-89a2-843cee2e5b6d
@@ -633,28 +632,28 @@ trajectory_planets = md((
 
 # ╔═╡ 93697e4d-369b-48e9-8b28-a0ff58604d02
 md"""
-If you are wandering why the errors oscilate, it is because the trajectories are periodic. Whenever all possible trajectories starting from within the uncertainty interval cross each other, the error of the predicted position is independent on the initial coordinates. Thus, the derivative of the position is zero relative to initial position, and so it the propagated uncertainty when using a linear propagation rule.
+Se você se perguntou porque os erros oscilam, é porque as trajetórias são periódicas. Quando todas as trajetórias inciadas no intervalo de posições associado às incertezas se cruzam, a posição é independente da posição inicial, portanto a incerteza é nula. Em outras palavras, a derivada da posição é zero em função da posição inicial, portanto a incerteza propagada linearmente é nula.  
 """
 
 # ╔═╡ c4344e64-aa22-4328-a97a-71e44bcd289f
 md"""
-One thing I don't like, though, is that in two years the Earth did not complete two  revolutions around the Sun. Something is wrong with our data. Can we improve that?
+Uma coisa que não está bonita, no entanto, é que em dois anos a Terra não completou duas revoluções completas em torno do Sol. Alguma coisa está errada com nossos dados. Podemos melhorar isso?
 """
 
 # ╔═╡ 827bda6f-87d4-4d36-8d89-f144f4595240
 md"""
-## We can differentiate everything!
+## Podemos derivar tudo!
 
-Perhaps astoningshly (at least for me), our simulation is completely differentiable. That means that we can tune the parameters of the simulation, and the data, using optimization algorithms that require derivatives. 
+É supreendente (ao menos para mim) que nossa simulação é completamente diferenciável. Isto quer dizer que podemos ajustar os parâmetros da simulação, e os dados, usando algoritmos de otimização que requerem derivadas analíticas. 
 
-Here we speculate that what was wrong with our data was that the initial position of the Earth was somewhat out of place. That caused the Earth orbit to be slower than it should.
+Aqui, especulamos que o que estava errado com nossos dados era a posição inicial da Terra. Isso fez com que a órbita fosse um pouco mais lenta do que deveria ser. 
 
-We will define, then, an objective function which returns the displacement of the Earth relative to its initial position (at day one) after two years. Our goal is that after one year the Earth returns to its initial position.
+Vamos definir, então, uma função objetivo que retorna o deslocament da Terra relativamente a sua posição inicial (no primeiro dia) depois de 2 anos. Nosso objetivo é que a Terra volte à sua posição inicial. 
 """
 
 # ╔═╡ 1ff4077a-4742-4c5e-a8d6-c4699469a683
 md"""
-First, we define a function that executes a simulation of *two years* of an Earth orbit, starting from a given position for the Earth `x` coordinate as a parameter. We will be careful in making all other coordinates of the same type of `x`, so that the generality of the type of variable being used is kept consistent:
+Primeiro, definimos uma função que exeuta uma simulação de *dois anos* da órbita da Terra. A simulação se inicia com uma posição `x` para a Terra, que é um parâmetro desta função. Vamos ser cuidadosos em definir todas as coordenadas com o mesmo tipo de variável que a o parâmetro `x` de entrada, de forma que a função permaneça genérica e os tipos todos consistentes:  
 """
 
 # ╔═╡ 4a75498d-8f4e-406f-8b01-f6a5f153919f
@@ -684,19 +683,19 @@ end
 
 # ╔═╡ 3ae783ce-d06e-4cc2-b8a3-94512e8f1490
 md"""
-Now we define our objective function, consisting of the norm of the difference between the initial and final coordinates of the Earth after two year (what we want is that the Earth returns to its initial position):
+Agora, definimos nossa função objetivo, que é o módulo do vetor diferença entre a posição inicial e a posição final da Terra (queremos que ela volte para a posição inicial):
 """
 
 # ╔═╡ 13e7da81-8581-4f32-9fdb-2599dd36a12c
 function error_in_orbit(x::T=149.6) where T
-	nsteps = 2*3650 # two years
+	nsteps = 2*3650
     traj = earth_orbit(x,nsteps,nsteps) # Save last point only
     return norm(traj[end][2]-[x,0.])
 end
 
 # ╔═╡ 4870b1f3-3134-4ddc-a59d-fa806b456a23
 md"""
-We can see that our current data results in a significant error:
+Podemos ver que com os nossos dados atuais o resultado tem um erro significativo:
 """
 
 # ╔═╡ fda6171c-9675-4f2e-b226-7ccf100529cd
@@ -704,12 +703,12 @@ error_in_orbit()
 
 # ╔═╡ a862f8a3-0131-4644-bc90-246bf3120790
 md"""
-We want to minimize this error, and it turns out that your simulation is fully differentiable. We will use here the `ForwardDiff` automatic differentiation package:
+Queremos minimizar este erro, e resulta que nossa simulação é completamente diferenciável. Vamos usar o pacote `ForwarDiff` de diferenciação automática:
 """
 
 # ╔═╡ eee3ac4b-4ddb-4699-b6e6-f0ffcc562c07
 md"""
-Which can be used just as it it to compute the derivative of the error in the orbit relative to the initial `x` position of the Earth:
+Este pacote pode ser usado sem modificações para calcualr as derivadas do erro da órbita relativamente à posição inicial `x` da Terra:
 """
 
 # ╔═╡ 107aec28-ecb5-4007-95e5-25d0a7f0c465
@@ -717,7 +716,7 @@ ForwardDiff.derivative(error_in_orbit,149.6)
 
 # ╔═╡ 1394e4c6-c371-47c0-8ca8-f0830d63d8ec
 md"""
-To minimize the error in the orbit we will write a simple stepest descent algorithm. Many packages are available for optimization, but here we will keep things simpler also to illustrate that writting the optimizer in Julia is a valid alternative:
+Para minimizar o erro, escreveremos um simples algorítmo de descida. Muitos pacotes fornecem algoritmos mais sofisticados de otimização, mas aqui vamos manter o código simples também para ilustrar que é possível implementar o algoritmo em Julia:
 """
 
 # ╔═╡ 535716e6-9c1c-4324-a4cd-b1214df3c01d
@@ -744,7 +743,7 @@ end
 
 # ╔═╡ b8edfb4e-6780-4ce7-94c1-4073ff7fa832
 md"""
-The derivative of our error can be computed by *closing over* the `error_in_orbit` function:
+A derivada do erro pode ser calculada usando a função `error_in_orbit` na forma de uma *closure*:
 """
 
 # ╔═╡ b8320f78-323c-49a9-a9f9-2748d19ecb35
@@ -752,7 +751,7 @@ error_derivative(x) = ForwardDiff.derivative(error_in_orbit,x)
 
 # ╔═╡ 92737d73-676c-4c96-a321-831ecaf37690
 md"""
-And now we can call the `gradient_descent` function directly:
+Agora podemos chamar a função `gradient_descent` diretamente:
 """
 
 # ╔═╡ 931a9c5f-8f91-4e88-956b-50c0efc9c58b
@@ -760,7 +759,7 @@ best_x0 = gradient_descent(149.6,error_in_orbit,error_derivative,1e-4,1000)
 
 # ╔═╡ b5b96082-efde-464f-bcd4-f2e0a84befcd
 md"""
-The result is reasonable: the error in the orbit has significantly being disminished:
+O resultado é razoável: o erro na órbita diminuiu significativamente: 
 """
 
 # ╔═╡ 7658a32c-d3da-4ec9-9d96-0d30bb18f08c
@@ -768,7 +767,7 @@ error_in_orbit(best_x0[1])
 
 # ╔═╡ e61981d5-5448-45e9-81dc-320ac87ba813
 md"""
-Let us see our trajectory now with the new initial condition:
+Vamos como mudou nossa trajetória com as novas condições iniciais:
 """
 
 # ╔═╡ 31e1bb51-c531-4c4a-8634-5caafb7e9e51
@@ -779,35 +778,34 @@ earth_traj_best = earth_orbit(best_x0[1])
 
 # ╔═╡ 47c205c3-ceae-4e12-9ade-753df1608deb
 md"""
-The dark blue dot is the corrected trajectory, and the light blue dot is the original one. Therefore, we were able to optimize the *initial point* of the trajectory with a gradient-based method. This concept can be used for adjusting parameters in simulations of many kinds (particle simulations or differential equations in general).
+O ponto azul escuro é a trajetória corrigida, e o azul claro corresponde à trajetória original. Fomos capazes de otimizar *o ponto inicial* da trajetória com um método baseado no gradiente. Este conceito pode ser usado para ajustar parâmetros de simulações de vários tipos (simulações de partículas ou equações diferenciais em geral).
 """
 
 # ╔═╡ 826693ff-9a9b-46b1-aeb3-767a5e6f9441
 md"""
-# Accelerating with CellListMap.jl
+# Acelerando com CellListMap.jl
 """
 
 # ╔═╡ d231842d-9b7a-4711-b71b-5d54041ebc1f
 md"""
-[`CellListMap.jl`](https://m3g.github.io/CellListMap.jl/stable/) is package aiming an efficient implementation of [cell lists](https://en.wikipedia.org/wiki/Cell_lists). Cell lists are practical algorithm to reduce the cost of computing short-ranged distances between particles. The package provides a general interface to compute any distance-dependent property, as potential energies and forces, nearest-neighbour lists, distribution functions, etc. It accepts systems with general (triclinic) periodic boundary conditions, in two and three dimensions. 
+[`CellListMap.jl`](https://m3g.github.io/CellListMap.jl/stable/) é um pacote que implemnta [células ligadas](https://en.wikipedia.org/wiki/Cell_lists) de forma eficiente. Células ligadas são uma forma prática de reduzir o custo do cálculo de propriedades que dependem de distâncias entre partículas dentro de um raio de corte (interações de curto alcance ou listas de vizinhos). O pacote tem uma interface que premite calcular qualquer propriedade dependente da distância, como energias potenciais, forças, funções de distribuição, etc. Condições periódicas de contorno triclinicas (gerais) podem ser usadas, em duas ou três dimensões. 
 
-The most simple cell list algorithm is relatively simple. Many optimizations can be done, however, on the construction of the lists, on the handling of periodic conditions, minimization of the number of unnecessary distance computations, and the parallelization of the construction of the lists and the mapping of the property to be evaluated. 
-
+O algorítmo de células ligadas mais simples é bastante simples. Muitas otimizações podem ser feitas, no entanto, na construção das listas e no trato das condições periódicas de contorno, minimizando o número de distâncias desnecessárias calculadas. O cálculo também pode ser paralelizado.
 """
 
 # ╔═╡ 53cedd26-3742-4c23-a8b8-8a1f2bdfa135
 md"""
-## The naive algorithm is too slow O(n²)
+## O algoritmo ingênuo é muito lento O(n²)
 """
 
 # ╔═╡ 889f837d-2e26-4261-b276-5fd91efdda6a
 md"""
-With ~1k, particles, the number of pairs of particles is already of the order of hundreds of thousands. The naive O(n²) algorithm is already too slow. Typical simulations involve tenths of thousands to millions of particles.
+Com ~1k partículas, o número de pares de partículas já é da ordem de centenas de milhares. O algoritmo ingênuo O(n²) já lento demais. Simulações típicas envolvem dezenas ou centenas de milhares de partículas. 
 """
 
 # ╔═╡ 670a01e3-82f8-4c7f-8577-852081d91ed7
 md"""
-Here, we will simulate 1000 particles to start:
+Para começar, vamos simular 1000 partículas: 
 """
 
 # ╔═╡ fce1e3e0-cdf7-453f-b913-964c10fa85a6
@@ -815,7 +813,7 @@ const n_large = 1000
 
 # ╔═╡ 69a92ac6-833c-4605-b3d0-9400e4572886
 md"""
-Our previous system had 100 particles in a square of side 100. We will keep the density constant:
+Nosso sistema anterior tinha 100 partículas em um quadrado de lado 100. Vamos manter a densidade constante: 
 """
 
 # ╔═╡ 542a9ef5-d9ee-49bd-9d31-61e28b80b5cb
@@ -823,7 +821,7 @@ const box_side = sqrt(n_large / (100/100^2))
 
 # ╔═╡ 8bada25c-b586-42b4-851d-232ccca8a456
 md"""
-We only need to generate the coordinates and run:
+Só precisamos gerar novas coordenadas e rodar a simulação:
 """
 
 # ╔═╡ 7600c6dc-769e-4c77-8526-281a1bcec079
@@ -832,7 +830,7 @@ x0_large = [ Vec2D(box_side*rand(),box_side*rand()) for _ in 1:n_large ]
 # ╔═╡ 29dbc47b-3697-4fdf-8f34-890ab4d0cdae
 t_naive = @elapsed trajectory_periodic_large = md((
     x0 = x0_large, 
-    v0 = [random_vec(Vec2D{Float64},(-1,1)) for _ in 1:n_large ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:n_large ], 
     mass = [ 10.0 for _ in 1:n_large ],
     dt = 0.1,
     nsteps = 1000,
@@ -842,17 +840,17 @@ t_naive = @elapsed trajectory_periodic_large = md((
 
 # ╔═╡ 0ee7fc18-f41f-4179-a75e-1e1d56b2db29
 md""" 
-Running time of naive algorithm: $t_naive seconds
+Tempo de execução do algoritmo ingênuo: $t_naive seconds
 """
 
 # ╔═╡ 0d0374ed-5150-40e6-b5a4-9a344b6ca47a
 md"""
-## Using cell lists
+## Usando células ligadas
 """
 
 # ╔═╡ f7cf613e-be9d-4f62-a778-cc4375eb99df
 md"""
-In cell lists, the particles are classified in cells before any distance computation. The distances are computed only for particles of vicinal cells. If the side of the cells is much smaller than the side of the complete system, the number of computations is drastically reduced.
+Nas células ligadas, as partículas são classificadas em células antes de qualquer cálculo de distâncias. As distâncias são calculadas apenas para partículas de células vizinhas. Se o tamanho das células é muito menor que o tamanho total do sistema, o número de distâncias calculado é drasticamente reduzido. 
 """
 
 # ╔═╡ 5be87c6f-5c31-4d14-a8cb-4e63ef39d538
@@ -917,7 +915,7 @@ end
 
 # ╔═╡ 0c07edd3-c0a1-4f72-a16a-74badb7a6123
 md"""
-To use `CellListMap.jl` we need to setup our system, by providing the data on the box properties and the cutoff of the interactions:
+Para usar o `CellListMap.jl`, precisamos definir o sistema, fornecendo os dados do tamanho da caixa e o raio de corte:
 """
 
 # ╔═╡ 4fc5ef4d-e072-41f7-aef9-b42730c8313c
@@ -925,7 +923,7 @@ box = Box([box_side,box_side],cutoff)
 
 # ╔═╡ 19c5cc9d-8304-4e36-a3ea-a1151f28f71d
 md"""
-The particles are then classified in the cells. Virtual (ghost) particles are created at the boundaries to handle peridic boundary conditions and avoid having to wrap coordinates during the pairwise computation stage:
+As partículas são então classificadas nas células. Partículas virtuais são criadas nas fronteiras para lidar com as condições periódicas de contorno e evitar ter que calcular imagens mínimas durante o cálculo das interações por pares: 
 """
 
 # ╔═╡ 7dcadd85-2986-4e42-aa84-67128a8f666d
@@ -933,7 +931,7 @@ cl = CellList(x0_large,box)
 
 # ╔═╡ 0b5c6ede-bceb-499a-a9a8-3c6a75ed340a
 md"""
-We only need to implement the function that has to be evaluated *if$ the particles are closer than the cutoff. This function will only be called in that case. Here, the function will update the force vector:
+Só precisamos implementar a função que é avaliada *se* o par de partículas está dentro do raio de corte. Esta função só será chamada nesta condição. Aqui, a função vai atualizar o vetor de forças:
 """
 
 # ╔═╡ 91b5eac1-4799-4a72-ac6a-e2b117b787d5
@@ -948,7 +946,7 @@ end
 
 # ╔═╡ 0f86ab3c-29aa-472b-8194-228c736ee940
 md"""
-The function that computes the forces in our simulation will, then, consist of an update of the cell lists followed by a call to the `map_pairwise!` function of `CellListMap.jl`, which takes as arguments the function to be mapped (`fpair_cl` here), the initial value of the forces vector `f`, and the system properties. We run only the serial version in this example:
+A função que calcula as forças na nossa simulação vai, então, consistir na atualização das listas de células, seguida da chamada da função `map_pairwise!` de `CellListMap.jl`, que recebe como argumento a função que atualiza a força entre um par de partículas (`fpair_cl`, aqui), além do vetor de forças que deve ser atualizado, `f`, e as propriedades do sistema. Aqui vamos executar somente a versão serial:
 """
 
 # ╔═╡ 0b8a2292-c0d6-44e4-b560-32d9d579a008
@@ -964,13 +962,13 @@ end
 
 # ╔═╡ d6585cca-78bf-41d1-aea3-01d9831d76cb
 md"""
-With a proper definition of the function to compute forces, we can now run again the simulation:
+Agora que temos uma definição apropriada da função que calcula as forças, podemos rodar a simulação novamente:
 """
 
 # ╔═╡ 1b7b7d48-79d2-4317-9045-5b7e7bd073e5
 t_cell_lists = @elapsed trajectory_cell_lists = md((
     x0 = x0_large, 
-    v0 = [random_vec(Vec2D{Float64},(-1,1)) for _ in 1:n_large ], 
+    v0 = [random_point(Vec2D{Float64},(-1,1)) for _ in 1:n_large ], 
     mass = [ 10.0 for _ in 1:n_large ],
     dt = 0.1,
     nsteps = 1000,
@@ -980,28 +978,30 @@ t_cell_lists = @elapsed trajectory_cell_lists = md((
 
 # ╔═╡ 3f9dad58-294c-405c-bfc4-67855bb1e825
 md""" 
-Running time of CellListMap: $t_cell_lists seconds (on the second run - compilation takes about 2 seconds).
+Tempo de execução usando `CellListMap.jl`: $t_cell_lists segundos (na segunda execução, a compilação demora cerca de 2 segundos).
 """
 
 # ╔═╡ 6d61b58f-b88f-48f4-8bdd-0bb1a8bc1c82
 md"""
-Even for a small system like this one, the speedup is significant (of about $(round(Int,t_naive/t_cell_lists)) times here). 
+Mesmo para um sistema pequeno como este, a simulação foi acelerada significativamente (em terno de $(round(Int,t_naive/t_cell_lists)) vezes). 
 """
 
 # ╔═╡ 76b8695e-64dc-44bc-8938-ce22c4a9e4d0
 md"""
-## Energy minimization: the Packmol strategy
+## Minimização da energia: A estratégia do Packmol
 """
 
 # ╔═╡ 372637ff-9305-4d45-bf6e-e6531dadbd14
 md"""
-### A Lennard-Jones potential energy
+### O potencial de Lennard-Jones
+
+voltar
 
 Molecular dynamics simulations usually involve computing, for each pair of atoms, a Lennard-Jones function of the form:
 
 $$u(r) = \varepsilon\left(\frac{\sigma^{12}}{r^{12}} - 2\frac{\sigma^6}{r^6}\right)$$
 
-The high powers make the numerical behavior of this function quite undesirable. For example, let us try to minimize the energy of a randomly generated set of positions.
+The high powers make the numerical behavior of this function quite undesirable. For example, let us try to minimize the energia a randomly generated set of points.
 
 We will define one function that adds to the energy the contribution of a given pair of particles, and then use the `map_pairwise!` function of `CellListMap.jl` to compute this function for all pairs closer than a cutoff.
 """
@@ -1067,7 +1067,7 @@ end
 md"""
 ### A physical system: Neon gas
 
-To explore something more interesting than a two-dimensional set of positions, we will approach an actual physical system. 
+To explore something more interesting than a two-dimensional set of points, we will approach an actual physical system. 
 
 We will compute the energy of a Ne gas with 10k particles, with density $\sim 0.1$ particles/Å³, which is roughly the atomic density of liquid water. 
 
@@ -1097,7 +1097,7 @@ Initial coordinates, box and cell lists. A typical cutoff for Lennard-Jones inte
 """
 
 # ╔═╡ 10826a95-16f8-416d-b8c1-0ef3347c9b20
-x0_Ne = [random_vec(Vec3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
+x0_Ne = [random_point(Vec3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
 
 # ╔═╡ c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 md"""
@@ -1273,8 +1273,8 @@ end
 
 # ╔═╡ d87c22d1-d595-4d43-ab1c-f28d282a3485
 build_plots && ( trajectory_2D_error = md((
-    x0 = [random_vec(Vec2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
-    v0 = [random_vec(Vec2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
+    x0 = [random_point(Vec2D{Measurement{Float64}},(-50,50),1e-5) for _ in 1:100 ], 
+    v0 = [random_point(Vec2D{Measurement{Float64}},(-1,1),1e-5) for _ in 1:100 ],
     mass = [ 1.0 for _ in 1:100 ],
     dt = 0.1,
     nsteps = 100,
@@ -1418,7 +1418,7 @@ ulj(x_pack,ε,σ,box_Ne,cl_Ne)
 # ╔═╡ 339487cd-8ee8-4d1d-984b-b4c5ff00bae3
 t_Ne = @elapsed trajectory_Ne = md((
     x0 = x_pack, 
-    v0 = [random_vec(Vec3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
+    v0 = [random_point(Vec3D{Float64},(-1,1)) for _ in 1:n_Ne ], 
     mass = [ 20.179 for _ in 1:n_Ne ],
     dt = 0.01,
     nsteps = 100,
@@ -1479,7 +1479,7 @@ md"""
 side_test = 50
 
 # ╔═╡ 7f556f7c-cdb0-4f91-a359-2f933bbc5b68
-xtest = [ random_vec(Vec2D{Float64},(-side_test,side_test)) for _ in 1:1000 ]
+xtest = [ random_point(Vec2D{Float64},(-side_test,side_test)) for _ in 1:1000 ]
 
 # ╔═╡ 0fc843d2-ac4f-4717-a298-92a476223112
 tol_test = 2
