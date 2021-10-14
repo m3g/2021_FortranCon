@@ -1001,7 +1001,7 @@ Molecular dynamics simulations usually involve computing, for each pair of atoms
 
 $$u(r) = \varepsilon\left(\frac{\sigma^{12}}{r^{12}} - 2\frac{\sigma^6}{r^6}\right)$$
 
-The high powers make the numerical behavior of this function quite undesirable. For example, let us try to minimize the energy of a randomly generated set of positions.
+The high powers make the numerical behavior of this function quite undesirable. Let us try to minimize the energy of a randomly generated set of positions.
 
 We will define one function that adds to the energy the contribution of a given pair of particles, and then use the `map_pairwise!` function of `CellListMap.jl` to compute this function for all pairs closer than a cutoff.
 """
@@ -1024,7 +1024,7 @@ end
 
 # ╔═╡ 9a8d8012-ba54-4d9b-8c4c-fe6358508f2a
 md"""
-And the function that computes the total energy is the mapping of that function to all relevant pairs through the `map_pairwise!` function:
+The function that computes the total energy is the mapping of that function to all relevant pairs through the `map_pairwise!` function:
 """
 
 # ╔═╡ ffbeae5f-8aec-4473-a446-5b73bd911733
@@ -1040,7 +1040,7 @@ end
 
 # ╔═╡ 3738e40f-9596-469d-aa58-a4b28d8a22f8
 md"""
-and we implement the corresponding functions that updates the forces:
+The corresponding functions that updates the forces are:
 """
 
 # ╔═╡ 5f1054b8-2337-43c1-a086-26233e95d42b
@@ -1067,7 +1067,7 @@ end
 md"""
 ### A physical system: Neon gas
 
-To explore something more interesting than a two-dimensional set of positions, we will approach an actual physical system. 
+Let us study a system of particles with an actual physical meaning, which is more interesting that a random set of points. 
 
 We will compute the energy of a Ne gas with 10k particles, with density $\sim 0.1$ particles/Å³, which is roughly the atomic density of liquid water. 
 
@@ -1082,7 +1082,7 @@ const σ = 2*1.64009 # Å
 
 # ╔═╡ b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
 md"""
-And we chose to simulate 10k particles, for which an atomic density typical of room-temperature liquids results in the following corresponding box side (thus, we are actually simulating a hihgly-compressed Neon gas, but this is more interesting because the number or pairwise interactions which have to be computed is greater for denser systems):
+We chose to simulate 10k particles, for which an atomic density typical of room-temperature liquids results in the following box side (thus, we are actually simulating a highly-compressed Neon gas, but this is more interesting because the number or pairwise interactions which have to be computed is greater for denser systems):
 """
 
 # ╔═╡ cd1102ac-1500-4d79-be83-72ac9180c7ce
@@ -1091,17 +1091,12 @@ const n_Ne = 10_000
 # ╔═╡ f21604f4-e4f7-4d43-b3d9-32f429df443e
 const box_side_Ne = (10_000/0.1)^(1/3)
 
-# ╔═╡ 59b1dbce-64af-4868-8c9d-23792c4a3a9f
-md"""
-Initial coordinates, box and cell lists. A typical cutoff for Lennard-Jones interactions in MD simulations is 12Å. 
-"""
-
 # ╔═╡ 10826a95-16f8-416d-b8c1-0ef3347c9b20
 x0_Ne = [random_vec(Vec3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
 
 # ╔═╡ c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 md"""
-Given the initial coordinates, we can initialize the system box and cell lists:
+Given the initial coordinates, box size, and a typical cutoff of 12Å, we can initialize the system box and cell lists:
 """
 
 # ╔═╡ 7c433791-a653-4836-91e2-084355c01d90
@@ -1205,7 +1200,7 @@ We can run a simulation of this gas using the same functions we defined before, 
 md"""
 # Remarks
 
-1. Many types of distributions of values, for instance, coordinates, can ben generated with the `Distributions.jl`  package. The generic character of the functions allow the functions to be used on custom types, as the `Vec2D` implemented here.
+1. Many types of distributions, for instance, of coordinates, can ben generated with the `Distributions.jl`  package. The generic character of the functions allow the functions to be used on custom types, as the `Vec2D` implemented here.
 
 2. The integrator of our `md` function is only the simplest one. The standard integrator for MD simulations is `Velocity-Verlet`, and is implemented in the code that compares the performance of `CellListMap.jl` and NAMD. Many other integration algorithms are implemented, for example, in the `DifferentialEquations.jl` package.
 
@@ -1217,7 +1212,7 @@ md"""
 md"""
 # Acknowledgements
 
-The author thanks [Mosè Giordano](https://giordano.github.io/) for valuable discussions on the working of `Measurements`, and many other members of the Julia and Fortran discourse forums for indirect contributions to this work. We also thank the FortranCon organizing comitee, in particular [Milan Curcic](https://milancurcic.com/) and [Ondřej Čertík](Ondřej Čertík) for the kind invitation and great contributions for the developement of a modern community and tools around Fortran.
+The author thanks [Mosè Giordano](https://giordano.github.io/) for valuable discussions on the working of `Measurements`, and many other members of the Julia and Fortran discourse forums for indirect contributions to this work. We also thank the FortranCon organizing comitee, in particular [Milan Curcic](https://milancurcic.com/) and [Ondřej Čertík](https://github.com/certik) for the kind invitation and great contributions for the developement of a modern community and tools around Fortran.
 """
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
@@ -2651,7 +2646,6 @@ version = "0.9.1+5"
 # ╟─b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
 # ╠═cd1102ac-1500-4d79-be83-72ac9180c7ce
 # ╠═f21604f4-e4f7-4d43-b3d9-32f429df443e
-# ╟─59b1dbce-64af-4868-8c9d-23792c4a3a9f
 # ╠═10826a95-16f8-416d-b8c1-0ef3347c9b20
 # ╟─c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 # ╠═7c433791-a653-4836-91e2-084355c01d90
