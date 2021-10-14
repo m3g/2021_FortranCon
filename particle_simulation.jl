@@ -1449,7 +1449,7 @@ user    7m38,053s
 sys     0m2,172s
 ````
 
-This comparison of course can be questined: `NAMD` is a general purpose MD package designed for massive-parallel simulations, wnd `CellListMap.jl` is a package for computing any distance-dependent property, and for now designed and optimized on shared-memory computers. 
+This comparison of course can be questined: `NAMD` is a general purpose MD package designed for massive-parallel simulations, and `CellListMap.jl` is a package for computing any distance-dependent property, and for now designed and optimized on shared-memory computers. 
 
 Nevertheless,the benchmark shows that it is possible to write high-performant code in Julia, and that `CellListMap.jl` is a powerful tool for simulating or computing distance-dependent properties from the results of simulations.
 
