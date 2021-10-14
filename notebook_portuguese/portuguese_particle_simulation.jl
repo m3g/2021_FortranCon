@@ -75,7 +75,7 @@ md"""
 md"""
 # Definindo o tipo de partícula
 
-Definiremos, em princípio, um simples vetor em um espaço bidimensional, com coordenadas `x` e `y`.  O ponto será definido com a ajuda do pacote `StaticArrays`, que fornece uma interface conveniente para este tipo de variável, e sua aritmética. A estrutura na memória de vetores destes pontos é idêntica àquela de matrizes `N×M`, onde `Nl` é a dimensão do espaço (aqui 2D) e `Ml` é o número de pontos. Julia é "column-major", então este é o formato mais eficiente para este tipo de cálculo. 
+Definiremos, em princípio, um simples vetor em um espaço bidimensional, com coordenadas `x` e `y`.  O ponto será definido com a ajuda do pacote `StaticArrays`, que fornece uma interface conveniente para este tipo de variável, e sua aritmética. A estrutura na memória de vetores destes pontos é idêntica àquela de matrizes `N×M`, onde `N` é a dimensão do espaço (aqui 2D) e `M` é o número de pontos. Julia é "column-major", então este é o formato mais eficiente para este tipo de cálculo. 
 """
 
 # ╔═╡ 8c444ee4-8c77-413a-bbeb-9e5ae2428876
@@ -995,25 +995,23 @@ md"""
 md"""
 ### O potencial de Lennard-Jones
 
-voltar
-
-Molecular dynamics simulations usually involve computing, for each pair of atoms, a Lennard-Jones function of the form:
+Simulações de dinâmica moelcular geralmente envovlem o cálculo, para cada par de átomos, de um pontecial de Lennard-Jones, que tem a forma:
 
 $$u(r) = \varepsilon\left(\frac{\sigma^{12}}{r^{12}} - 2\frac{\sigma^6}{r^6}\right)$$
 
-The high powers make the numerical behavior of this function quite undesirable. For example, let us try to minimize the energia a randomly generated set of points.
+As potências altas envolvidas fazem o cálculo desta função numericamente instável. Vamos tentar minimizar a energia de um conjunto de pontos gerado aleatoriamente.
 
-We will define one function that adds to the energy the contribution of a given pair of particles, and then use the `map_pairwise!` function of `CellListMap.jl` to compute this function for all pairs closer than a cutoff.
+Vamos definir uma função que soma a energia de todas as contribuições de pares de partículas, e usar a função `map_pairwise!` do `CellListMap.jl` para calcular a contribuição de todos os pares de partículas mais próximas que um dado raio de corte.  
 """
 
 # ╔═╡ 3b2c08a6-b27e-49be-a0b0-e5cb3d5546e0
 md"""
-The `FastPow` package unrols the high powers that need to be computed into multiplications, squares and cubes, which are faster to compute (with some loss of precision which is of no concern here). This could be done by hand, but for code clarity and convenience, we opt to use the `@fastpow` macro.
+O pacote `FastPow` expande as potências altas em produtos de potenciais menores, que são mais rápidas de calcular (com alguma perda de precisão, que não é importante aqui). Esta expansão poderia ser feita à mão, mas para que o código fique mais claro, e por conveniência, usaremos a macro `@fastpow`.
 """
 
 # ╔═╡ 7280e368-c68a-48a5-91fe-93c76607c144
 md"""
-The function that computes the energy associated to one pair of particles is, then:
+A função que calcula a energia associada a um par de partículas é:
 """
 
 # ╔═╡ 755fae26-6db9-45a0-a60d-d0e9c063f8aa
@@ -1024,7 +1022,7 @@ end
 
 # ╔═╡ 9a8d8012-ba54-4d9b-8c4c-fe6358508f2a
 md"""
-And the function that computes the total energy is the mapping of that function to all relevant pairs through the `map_pairwise!` function:
+E a função que calcula a energia total, mapeando esta função de pares para todos os pares de partículas mais próximos que o raio de corte é, então:
 """
 
 # ╔═╡ ffbeae5f-8aec-4473-a446-5b73bd911733
@@ -1040,7 +1038,7 @@ end
 
 # ╔═╡ 3738e40f-9596-469d-aa58-a4b28d8a22f8
 md"""
-and we implement the corresponding functions that updates the forces:
+As funções correspondentes para calcular as forças são:
 """
 
 # ╔═╡ 5f1054b8-2337-43c1-a086-26233e95d42b
@@ -1065,13 +1063,13 @@ end
 
 # ╔═╡ f289955b-0239-4b8d-ba08-2edf0a7284c2
 md"""
-### A physical system: Neon gas
+### Um sistema físico: Um gás de Neônio
 
-To explore something more interesting than a two-dimensional set of points, we will approach an actual physical system. 
+Vamos simular um sistema com algum significado físico, que é mais interessante que apenas um conjunto de pontos quaisquer.
 
-We will compute the energy of a Ne gas with 10k particles, with density $\sim 0.1$ particles/Å³, which is roughly the atomic density of liquid water. 
+Vamos calcular a energia de um gás de Neônio com 10 mil partículas, com densidade $\sim 1$ partículas/Å³, que é aproximadamente a densidade atômica na água líquida. 
 
-The Lennard-Jones parameters for Neon are:
+Os parâmetros de Lennard-Jones para o Neônio são:
 """
 
 # ╔═╡ 878ab5f7-28c1-4832-9c58-cb36b360766f
@@ -1082,7 +1080,8 @@ const σ = 2*1.64009 # Å
 
 # ╔═╡ b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
 md"""
-And we chose to simulate 10k particles, for which an atomic density typical of room-temperature liquids results in the following corresponding box side (thus, we are actually simulating a hihgly-compressed Neon gas, but this is more interesting because the number or pairwise interactions which have to be computed is greater for denser systems):
+Definindo uma densidade adequada para estas dez mil partículas, 
+o número de pares de partículas dentro do raio de corte é da ordem do número típico de uma simulação de dinâmica molecular convencional (estamos na verdade simulando um gás de Neônio em alta pressão).
 """
 
 # ╔═╡ cd1102ac-1500-4d79-be83-72ac9180c7ce
@@ -1091,17 +1090,12 @@ const n_Ne = 10_000
 # ╔═╡ f21604f4-e4f7-4d43-b3d9-32f429df443e
 const box_side_Ne = (10_000/0.1)^(1/3)
 
-# ╔═╡ 59b1dbce-64af-4868-8c9d-23792c4a3a9f
-md"""
-Initial coordinates, box and cell lists. A typical cutoff for Lennard-Jones interactions in MD simulations is 12Å. 
-"""
-
 # ╔═╡ 10826a95-16f8-416d-b8c1-0ef3347c9b20
 x0_Ne = [random_point(Vec3D{Float64},(0,box_side_Ne)) for _ in 1:n_Ne ]
 
 # ╔═╡ c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 md"""
-Given the initial coordinates, we can initialize the system box and cell lists:
+Dadas as posições iniciais, o tamanho da caixa e o raio de corte típico de 12Å, podemos inicializar as células ligadas: 
 """
 
 # ╔═╡ 7c433791-a653-4836-91e2-084355c01d90
@@ -1112,32 +1106,33 @@ const cl_Ne = CellList(x0_Ne,box_Ne)
 
 # ╔═╡ c08fff28-520e-40af-951c-fe3c324f67e0
 md"""
-### First, let us try to minimize the energy
+### Primeiro, vamos tentar minimizar a energia 
 """
 
 # ╔═╡ eb0f9080-2523-4633-be21-3a2281a1629e
 md"""
-The first thing in a MD simulation is trying to remove bad contacts by energy minimization:
+A primeira coisa que fazemos em uma simulação de dinâmica molecular é minimizar a energia do sistema para eliminar maus contatos (afastar partículas que estão muito próximas).
 """
 
 # ╔═╡ e3cc3c77-71ad-4006-8e27-fabaa1ae9cfb
 md"""
-The obtained energy (after 500 steps of stepest descent) is:
+A energia obtida (após 500 passos do método do gradiente), é:
 """
 
 # ╔═╡ 739c9a8a-13a5-4a33-a441-f5bc6cb35e82
 md"""
-### Packing the atoms
+### Empacotando os átomos
 """
 
 # ╔═╡ 4e059cb8-6dac-450d-9f46-b3e657d9c3cf
 md"""
-To pack the atoms the "cutoff" needs to be of the order of the atom radii, instead of the cutoff of the Lennard-Jones interactions. Thus, we redefine the cell lists with a cutoff of σ/2. Since only very short-ranged interactions have to be computed, and the function is well behaved, the optimization is fast:
+Para empacotar os átomos, o raio de corte precisa ser da ordem dos seus raios,
+em lugar do raio de corte das interações de Lennard-Jones. Então, redefinimos as listas de células com um raio de corte de σ/2. Como apenas interações de muito curto alcance serão calculadas, e a função é bem comportada, a otimização é muito rápida:
 """
 
 # ╔═╡ 5ff9c89a-d999-4af2-8e7e-fb99d4948c36
 md"""
-Let us initialize again the system, considering the smaller cutoff:
+Vamos redefinir a caixa, com o raio de corte menor:
 """
 
 # ╔═╡ 0f2f55f6-060b-475e-bef7-eaa99da4d99f
@@ -1148,7 +1143,7 @@ cl_pack = CellList(x0_Ne,box_pack)
 
 # ╔═╡ 53c2e16e-b7f5-4df2-96f4-08402b5f8979
 md"""
-We previously defined the short-range forces in the `forces_cl` function, but we didn't use the "energy" associated to it, which we will use now:
+Já havíamos definido uma função para calcular as forças de curto alcance (`forces_cl`), mas precisamos aqui a função de "energia" associada:
 """
 
 # ╔═╡ 16cdbc18-e846-4d0a-b7e6-87f07c0c52d9
@@ -1167,77 +1162,77 @@ end
 
 # ╔═╡ 79169f89-fedc-466b-8170-fff99b98e147
 md"""
-Given the packing energy and gradient, we can solve the packing problem:
+Dadas as funções de energia o gradiente das funções de empacotamente, podemos resolver o problema:
 """
 
 # ╔═╡ b5e258cd-5542-4a4c-ae0f-91c2fee426db
 md"""
-Importantly, the result is a packing function which converged to a global minimizer (the resulting packing function value is zero):
+É importante notar que a otimização do empacotamento convergiu para um minimizador global (a valor da função é zero):
 """
 
 # ╔═╡ b0dc1c2b-82b7-488d-8074-1ef9f59a15e5
 md"""
-The energy, on the other side, is not necessarily small:
+A energia, por outro lado, não é necessariamente baixa:
 """
 
 # ╔═╡ 97b8b15b-75c7-4321-999d-b067ed2a04f9
 md"""
-In two dimensions, this is the difference between a randomly generated set of coordinates, and a set obtained after solving the packing problem:
+Em duas dimensões, esta é a diferença entre um conjunto de pontos gerado aleatoriamente, e um conjunto de pontos obtido após a solução do problema de empacotamento:
 """
 
 # ╔═╡ 591e6a9c-444c-471f-a56b-4dfbc9111989
 md"""
-Even if the energy is high, we have the guarantee that no atoms are too close to each other, and this is an adequate configuration for a molecular dynamics simulation.
+Mesmo a energia total sendo alta, temos a garantia de que nenhum par de átomos está mais próximo que o raio de corte mínimo tolerável para as interações repulsivas de curto alcance. Assim, esta configuração é adequada para iniciar uma simulação.
 
-`Packmol` solves this packing problem for molecules of complex shape, allowing the user to specify different geometrical constraints that define the arrangements of the atoms in the system.
+`Packmol` resolve este problema de empacotamento de para moléculas de geometria complexa, e ao mesmo tempo permite ao usuário a especificação de diferentes restrições geométricas que podem ser usadas para definir o arranjo das espécies no espaço. 
 """
 
 # ╔═╡ 1f265576-824a-4764-a738-685554068079
 md"""
-## How fast is CellListMap.jl?
+## Quão rápido é `CellListMap.jl`?
 
-An idea of the efficiency of the cell list implementation in `CellListMap.jl` can be obtained by comparing the time required for an actual simulation of these Ne gas, compared to a stablished molecular dynamics simulation package, as [NAMD](https://www.ks.uiuc.edu/Research/namd/). 
+Uma ideia da eficiência da implementação das células ligadas em `CellListMap.jl` pode ser obtida comparando o tempo de uma simulação do gás de Neônio, com a mesma simulação feita por um pacote estabelecido de dinâmica molecular, como o [NAMD](https://www.ks.uiuc.edu/Research/namd/). 
 
-We can run a simulation of this gas using the same functions we defined before, but with the actual potential energy:
+Podemos executar a simulação usando a mesma função `md` de antes, mas com a função de energia potencial de Lennard-Jones correta:
 """
 
 # ╔═╡ 1e099e1f-6494-419b-8517-5bded3e18aa6
 md"""
-# Remarks
+# Notas
 
-1. Many types of distributions of values, for instance, coordinates, can ben generated with the `Distributions.jl`  package. The generic character of the functions allow the functions to be used on custom types, as the `Vec2D` implemented here.
+1. Muitos tipos de distribuições podem ser obtidas usando o pacote `Distributions.jl`. O caráter geral das funções em Julia permite que um pacote como este seja usado para gerar distribuições de tipos próprios, como o `Vec2D` implementado aqui. 
 
-2. The integrator of our `md` function is only the simplest one. The standard integrator for MD simulations is `Velocity-Verlet`, and is implemented in the code that compares the performance of `CellListMap.jl` and NAMD. Many other integration algorithms are implemented, for example, in the `DifferentialEquations.jl` package.
+2. A integração do nosso código `md` é a mais simples de todas. O algoritmo padrão para integração de equações de movimento em dinâmica molecular é o `Velocity-Verlet`, e é este que está implementado no código que compara a eficiência dos `CellListMap.jl` em relação ao NAMD. Muitas outras alternativas estão disponíveis no pacote `DifferentialEquations.jl`.
 
-3. The propagation of the uncertainty and the differentiability of particle simulations must be taken with a grain of salt. These systems are typically chaotic, thus uncertainties increase exponentialy, and derivatives are very unstable. An interesting blog post discussing the sensitivity of these calculations is [here](https://frankschae.github.io/post/shadowing/), and again the `DifferentialEquations.jl` package provides more adequate tools to deal with parameter optimization under such circunstances. 
+3. A propagação de incertezas e a diferenciabilidade da simulação de partículas precisa ser vista com um pouco de cautela. Estes sistemas são tipicamente caóticos, portanto as incetezas aumentam de forma exponencial, e as derivadas são muito instáveis. Um blog post interessante sobre a sensibilidade destes cálculos pode está disponível [aqui](https://frankschae.github.io/post/shadowing/). Novamente, o pacote `DifferentialEquations.jl` possui ferramentas mais adequadas para lidar com a otimização de parâmetros das simulações nessas circunstâncias. 
 
 """
 
 # ╔═╡ 10c86547-d4f4-4c3f-8906-ac18ce93f3b6
 md"""
-# Acknowledgements
+# Agradecimentos
 
-The author thanks [Mosè Giordano](https://giordano.github.io/) for valuable discussions on the working of `Measurements`, and many other members of the Julia and Fortran discourse forums for indirect contributions to this work. We also thank the FortranCon organizing comitee, in particular [Milan Curcic](https://milancurcic.com/) and [Ondřej Čertík](Ondřej Čertík) for the kind invitation and great contributions for the developement of a modern community and tools around Fortran.
+Agradeço a [Mosè Giordano](https://giordano.github.io/) por valiosas discussões a respeito do funcionamento pacote `Measurements`, e a [Chris Foster](https://github.com/c42f) por discussões a respeito da propagação de erros nas trajetórias e outras sugestões para o notebook. Também agradeço a vários outros membros dos fórums *discourse* de Julia e Fortran que contribuiram direta ou indiretamente com este trabalho. Agradeço finalmente ao comitê organizador da FortanCon2021 pelo convite, em particular a [Milan Curcic](https://milancurcic.com) e a [Ondřej Čertík](https://github.com/certik), e ao Prof. [Mendeli Vainstein](http://www.if.ufrgs.br/posfis-antigo/index.php/br/permanentes/431-mendeli-vainstein.html) pelo convite para apresentar o seminário na UFRGS. 
 """
 
 # ╔═╡ 2871aca3-e6b4-4a2d-868a-36562e9a274c
 md"""
-# Some notebook options and setup
+# Configurações do notebook
 """
 
 # ╔═╡ 2a2e9155-1c77-46fd-8502-8431573f94d0
 md"""
-## Default plot setup
+## Configurações padrão para os gráficos
 """
 
 # ╔═╡ b557a646-8c3c-4dc7-8788-bf98aec8c5c0
 md"""
-Use Printf to print some data.
+Usamos `Printf` para formatar alguns dados.
 """
 
 # ╔═╡ 260d5753-6cc2-4137-8a2c-8d8a47585ecf
 md"""
-We can set this to false to avoid ploting everything. 
+Podemos definir esta variável como `false` e não fazer nenhum gráfico.
 """
 
 # ╔═╡ a9981931-4cc9-4d16-a6d2-34b4071a84d7
@@ -1349,7 +1344,7 @@ end
 
 # ╔═╡ b4154fb7-e0b0-4211-8490-8a8fe47cd2da
 md"""
-## Gradient descent for vectors
+## Método do gradiente para vetores
 """
 
 # ╔═╡ 8ac7b1bf-c958-4eb5-8376-f802b372e796
@@ -1390,11 +1385,11 @@ ulj(x_min,ε,σ,box_Ne,cl_Ne)
 
 # ╔═╡ 574047fa-6626-4cd0-8317-32118129711e
 md"""
-Here the example is only illustrative, but shows a common behavior: the energy after minimization is still too high. The cost and numerical instability of the true potential, at short distances, make it hard to minimize.
+O exemplo aqui é somente ilustrativo, mas mostra um comportamento comum: a energia depois da minimização é ainda muito alta. O custo computacional e a instabilidade numérica do potencial verdadeiro, em curtas distâncias, faz da energia uma função difícil de minimizar. 
 
-**Time required for energy minimization: $t_min seconds**
+**Tempo usado na mininimzação da energia: $t_min seconds**
 
-Because of that [`Packmol`](http://m3g.iqm.unicamp.br/packmol) was introduced. We first solve the problem of packing the atoms in the space guaranteeing a minimum distance between the atoms. Here, this consists on the minimization of our simplified potential:
+Por causa disto [`Packmol`](http://m3g.iqm.unicamp.br/packmol) foi desenvolvido. Primeiro, resolvemos o problema de empacotar os átomos no espaço, garantindo que a menor distância entre eles seja maior que uma tolerância mínima. Aqui, isto consiste na minimização do nosso potencial suave original:
 """
 
 # ╔═╡ 224336e2-522c-44af-b9a1-307e2ffff0f9
@@ -1406,7 +1401,7 @@ t_pack = @elapsed x_pack = gradient_descent!(
 
 # ╔═╡ 06526edf-911a-4ecc-a350-6d932ca56cd5
 md"""
-**Time required for packing: $t_pack seconds**
+**Tempo necessário para o empacotamento: $t_pack seconds**
 """
 
 # ╔═╡ c48210e0-1a04-4f84-a4e2-f6b5d34a603d
@@ -1436,9 +1431,9 @@ end
 
 # ╔═╡ ac52a71b-1138-4f1b-99c3-c174d9f09187
 md"""
-This simulation took $t_Ne seconds. 
+A simulação demorou $t_Ne seconds. 
 
-Again, to understand exactly what that means, we need to perform a proper comparison. In [this benchmark](https://github.com/m3g/2021_FortranCon/tree/main/celllistmap_vs_namd) two simulations of the same gas, with proper thermodynamic conditions, are performed. The Julia algorithm implemented is similar to the present one, except that thermalization is done by velocity rescaling and the velocity-verlet algorithm is used for propagating the positions. The same algorthms are used in the equivalent NAMD simulations. The benchmark result is, for a 4-cores/8-threads execution in my Laptop:
+Novamente, para entender exatamente o que isto significa, temos que fazer uma comparação apropriada. [Neste benchmark](https://github.com/m3g/2021_FortranCon/tree/main/celllistmap_vs_namd) fazemos duas simulações deste mesmo gás, com condições termodinâmicas apropriadas. O algoritmo implementado em Julia é similar ao que está descrito aqui, exceto que é feita uma termalização por reescalonamento de velocidades, e o algoritmo Velocity-Verlet de integração é usado (o que aumenta a estabilidade da simulação, mas não a performance relativamente ao método simples aqui usado). Os mesmo algoritmos são usados na simulação realizada com o NAMD. O resultado do benchmark foi obtido em um laptop com 4 processadores físicos (e 8 threads).
 
 ````
 NAMD:
@@ -1454,17 +1449,17 @@ user    7m38,053s
 sys     0m2,172s
 ````
 
-This comparison of course can be questined: `NAMD` is a general purpose MD package designed for massive-parallel simulations, wnd `CellListMap.jl` is a package for computing any distance-dependent property, and for now designed and optimized on shared-memory computers. 
+Esta comparação claro que pode ser questionada: `NAMD` é um pacote de simulação de propósito geral, desenvolvido para ter eficiente em simulações massivamente paralelas. O `CellListMap.jl` é um pacote para computar qualquer propriedade dependente da distância, mas por enquanto otimizado apenas para computadores com memória compartilhada, e menos processadores.  
 
-Nevertheless,the benchmark shows that it is possible to write high-performant code in Julia, and that `CellListMap.jl` is a powerful tool for simulating or computing distance-dependent properties from the results of simulations.
+No entanto, o benchmark mostra que é possível escrever códigos de alta peformance em Julia, e que `CellListMap.jl` é uma ferramenta poderosa para a simlação ou cálculo de propriedades e análises customizadas de simulações de partículas. 
 
-One of the applications of this package is the computation of distribution functions, in the [ComplexMixtures.jl](https://m3g.github.io/ComplexMixtures.jl/stable/)  package.
+Uma das aplicações deste pacote consiste no cálculo de funções de distribuição de sistemas químicos de grande complexidade estruural, em [ComplexMixtures.jl](https://m3g.github.io/ComplexMixtures.jl/stable/).
 
 """
 
 # ╔═╡ b5008faf-fd43-45dd-a5a1-7f51e0b4ede5
 md"""
-## Table of Contents
+## Conteúdo
 """
 
 # ╔═╡ 555d1f62-b95b-4377-a8e2-9e442ee7526d
@@ -1472,7 +1467,7 @@ md"""
 
 # ╔═╡ f5510c1e-9b9f-49f0-bc7e-0fd8e79a5760
 md"""
-## 2D packing example
+## Exemplo de empacotamento em 2D
 """
 
 # ╔═╡ 5d9a40b5-4050-47d2-9855-e9b62d56e8df
@@ -2651,7 +2646,6 @@ version = "0.9.1+5"
 # ╟─b1c5b7e5-cfbf-4d93-bd79-2924d957ae14
 # ╠═cd1102ac-1500-4d79-be83-72ac9180c7ce
 # ╠═f21604f4-e4f7-4d43-b3d9-32f429df443e
-# ╟─59b1dbce-64af-4868-8c9d-23792c4a3a9f
 # ╠═10826a95-16f8-416d-b8c1-0ef3347c9b20
 # ╟─c46a4f97-78e4-42fd-82b3-4dc6ce99abac
 # ╠═7c433791-a653-4836-91e2-084355c01d90
