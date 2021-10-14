@@ -16,6 +16,8 @@ The main document here is the Pluto notebook file `particle_simulation.jl`, whic
 
 Note: the page is about 30Mb-large and may take some time to completely load. Be patient.
 
+(a portuguese version of this notebook is available [here](https://m3g.github.io/2021_FortranCon/portuguese_particle_simulations.jl.html))
+
 ##
 <p align=center>
 <img height=80px src=https://user-images.githubusercontent.com/31046348/119070689-e0b7d180-b9be-11eb-8da8-ce2fb70b6c9a.png>
