@@ -1,3 +1,6 @@
+import Pkg
+Pkg.activate(".")
+
 import Chemfiles
 using CellListMap
 using FastPow
@@ -7,7 +10,6 @@ using Base.Threads
 using Parameters
 using Statistics: mean
 using LinearAlgebra: norm_sqr
-using LoopVectorization
 
 #
 # Simulation setup
@@ -47,7 +49,7 @@ end
 # Kinetic energy and temperature 
 function compute_kinetic(v::AbstractVector,m) 
     norm_sqr_sum = zero(m)
-    @tturbo for i in eachindex(v)
+    for i in eachindex(v)
         norm_sqr_sum += norm_sqr(v[i])
     end
     return (m/2)*norm_sqr_sum
@@ -58,11 +60,11 @@ compute_temp(v::AbstractVector,m,kB) = 2*compute_kinetic(v,m)/(3*kB*length(v))
 # Remove drift from velocities
 function remove_drift!(v)
     vmean = zero(eltype(v))
-    @tturbo for i in eachindex(v)
+    for i in eachindex(v)
         vmean = vmean + v[i]
     end
     vmean = vmean / length(v)
-    @tturbo for i in eachindex(v)
+    for i in eachindex(v)
         v[i] = v[i] - vmean
     end
 end
@@ -139,9 +141,7 @@ function simulate(params::Params{V,N,T,UnitCellType}; parallel=true) where {V,N,
     for istep in 1:nsteps
 
         # Update positions (velocity-verlet)
-        @tturbo for i in eachindex(x)
-            x[i] = x[i] + v[i]*dt + 0.5*(f[i]/mass[i])*dt^2
-        end
+        @. x = x + v*dt + 0.5*(f/mass)*dt^2
 
         # Update cell lists
         cl = UpdateCellList!(x,box,cl,aux,parallel=parallel)
@@ -161,9 +161,7 @@ function simulate(params::Params{V,N,T,UnitCellType}; parallel=true) where {V,N,
         ) 
          
         # Update velocities
-        @tturbo for i in eachindex(v)
-            v[i] = v[i] + 0.5*((flast[i] + f[i])/mass[i])*dt 
-        end
+        @. v = v + 0.5*((flast + f)/mass)*dt 
 
         # Print data and output file
         kinetic = compute_kinetic(v,mass)
@@ -173,9 +171,7 @@ function simulate(params::Params{V,N,T,UnitCellType}; parallel=true) where {V,N,
         if istep%params.ibath == 0
             remove_drift!(v)
             temp = compute_temp(kinetic,kB,length(v))
-            @tturbo for i in eachindex(v)
-                v[i] = v[i] * sqrt(temperature/temp)
-            end
+            @. v = v * sqrt(temperature/temp)
         end
 
    end

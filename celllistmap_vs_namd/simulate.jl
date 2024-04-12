@@ -1,3 +1,6 @@
+import Pkg
+Pkg.activate(".")
+
 import Chemfiles
 using CellListMap
 using FastPow

@@ -12,8 +12,10 @@ These benchmarks were run on a Samsung i7 8th gen laptop, using 8 threads.
 
 ## Run the benchmark
 
-After installing NAMD, Julia, and the package dependencies (as explained below), execute the benchmark with:
+After installing NAMD (check the NAMD path in the `run.sh` file), 
+Julia, and the package dependencies (as explained below), execute the benchmark with:
 ```bash
+./install.sh # installs Julia packages in the environment
 ./run.sh
 ```
 
@@ -38,22 +40,6 @@ and two trajectory files will be created: `ne10k.dcd` by `NAMD`, and `ne10k_traj
 
 ## Code
 
-The Julia simulation code is available in the `simulate.jl` file. To execute it `Julia 1.6+` is required, and some package need to be installed. After installing Julia, launch a Julia REPL with
-
-```bash
-julia -t 8
-```
-(where `8` the number of threads desired), and do:
-
-```julia
-julia> import Pkg
-
-julia> packages = ["Chemfiles", "CellListMap", "FastPow", "StaticArrays", "Parameters" ]
-
-julia> Pkg.add(packages)
-
-julia> include("./simulate.jl")
-
-```
+The Julia simulation code is available in the `simulate.jl` file. To execute it `Julia 1.9+` is required, and some package need to be installed. A slightly accelerated version is available in the `simulate_opt.jl` file.  
 
 The NAMD program can be downloaded and installed from [the NAMD site](https://www.ks.uiuc.edu/Research/namd/).
